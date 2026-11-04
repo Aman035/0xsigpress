@@ -143,3 +143,46 @@ root), so the block-byte cap stops binding — but this is the **optimistic** de
 only caught if someone challenges within the window (shown working above). The validity-proof (STARK)
 version is still gated on K3/K4. The per-op execute cost is dominated by the account call + Merkle
 proof, not the signature.
+
+## K3 — proof system choice (4 Nov 2026)
+
+**Test:** find a hash-based proof system with a realistic path to a Solidity verifier; run any
+existing verifier on its example proof (local K4 data point). Details, repro commands and the full
+candidate table: `experiments/k3/README.md`; raw results in `experiments/k3/results/`.
+
+**Measured (local anvil, NOT Monad):**
+
+| What | Result | Source / command |
+|---|---|---|
+| LeanVM terminal verifier (sol-spartan-whir `LeanVmTwoCommitmentTerminal_KeccakPublicMemoryC1Pow28T6`, a complete recursive proof: LeanVM root AIR + LogUp/GKR + WHIR, running a Spartan-WHIR verifier in the guest), checked-in proof | **12,896,156 gas**, one tx, status 1, returns true; calldata **106,628 B**; runtime 62,732 B (fits Monad's 128 KB, not EIP-170); 2 tampered proofs revert | github.com/alxkzmn/sol-spartan-whir @ 18eda72; `cast send --create` + `cast send <addr> <calldata.bin>` on anvil (cancun, code-size-limit 65536). Matches the repo README's 12,896,156 exactly. |
+| sol-whir (BN254 WHIR PCS opening only, 2^16 vars, 80-bit, capacity conjecture) | 1,135,052 gas, 28,740 B calldata | github.com/privacy-ethereum/sol-whir @ b719b97; `forge script script/Verify.s.sol --broadcast` |
+| leanVM prover (leanEthereum/leanMultisig @ 4b67ca0), leanXMSS aggregation, `--log-inv-rate 1`, Apple M4 16 GB | 256 sigs: 299.8 KiB, 0.615 s. **1,024 sigs: 326.3 KiB (≈326 B/sig), 3.3 s**, 5.0 GiB. Rate 3: 207.3 KiB but 54.8 s. No EVM verifier exists for this (binary-field) version. | `cargo +nightly leanvm aggregate --xmss N` |
+
+**Estimated, not measured:** on Monad the terminal tx would cost ~12.9M (if calldata pricing works like
+EIP-7623's max(standard, floor)) to ~15.6M gas (execution 11.28M + 21k + 40 gas/B × 106,628 added on
+top). Monad charges the gas *limit*, so the limit must be set close to this. Both are under K4's 25M bar.
+
+**Licences (checked from files):** leanMultisig MIT + Apache-2.0; Plonky3 MIT/Apache-2.0; Stwo
+Apache-2.0; starkex-contracts Apache-2.0. sol-whir is MIT but depends on `solidity-bn254`, which is
+**GPL-3.0** — do not reuse. **sol-spartan-whir and its upstream ethereum/sol-whir-p3 have no LICENSE
+file** (README says MIT; every `src/` file is SPDX MIT) — get a LICENSE file before copying code.
+
+**Not found:** any Solidity verifier for Plonky3, Stwo, or current (binary-field) leanVM.
+
+**Unverified (self-reported):** sol-whir-p3 grouped terminal 10,666,368 gas / 99,044 B ("security under
+review"); standalone KoalaBear WHIR 2^22 @ 100-bit ~3.0-3.6M gas / ~54 KB; leanVM 1,400 sigs in 1.15 s on
+M4 Max; the claim that sol-whir's capacity-bound conjecture "has since been disproven" (ethresear.ch
+alxkzmn post, 19 May 2026).
+
+**Decision: K3 PASS (conditional).** Choose **leanVM recursion → Keccak terminal proof → sol-spartan-whir
+terminal verifier**. It is the only complete hash-based Solidity verifier found, it ran, and its proof
+fits Monad's gas, size and code limits in one tx. K6 is answered structurally: the EVM side computes
+only Keccak and 31-bit field arithmetic, no Poseidon2.
+Blockers before K4 can pass for *our* statement: (1) the terminal-profile prover is not public in these
+repos (scripts reference an external `../leanVM` workspace) — find it or ask the authors; (2) the
+terminal's public input must be bound to our batch root; (3) the Solidity terminal targets the
+KoalaBear-era leanVM, while leanVM main is binary-field; (4) our `WOTS.sol` is not leanXMSS — align the
+scheme; (5) missing LICENSE file. Effort estimate (not measured): 1-2 weeks if the terminal prover is
+obtainable; 4+ weeks otherwise.
+**K4 status:** local anvil data point passes the gas/size bar for the authors' fixture proof; Monad
+testnet run and a proof of our own statement are still to do. K4 is not yet passed.
