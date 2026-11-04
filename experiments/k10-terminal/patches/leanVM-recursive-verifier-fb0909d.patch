@@ -130,10 +130,10 @@ index 97fdf7fa..32fccf2f 100644
  [dev-dependencies]
 diff --git a/crates/spartan_whir_guest/src/bin/sigpress-xmss-terminal.rs b/crates/spartan_whir_guest/src/bin/sigpress-xmss-terminal.rs
 new file mode 100644
-index 00000000..86727841
+index 00000000..09edd80b
 --- /dev/null
 +++ b/crates/spartan_whir_guest/src/bin/sigpress-xmss-terminal.rs
-@@ -0,0 +1,1320 @@
+@@ -0,0 +1,1331 @@
 +// Modified by sigpress (K10-terminal) from leanvm-recursion-profile.rs (Apache-2.0, Client-Side-Proving/leanVM): the two
 +// Spartan-WHIR client fixtures are replaced by two raw leanXMSS aggregates generated in-process.
 +//! Diagnostic complete-chain measurements for two distinct application proofs.
@@ -510,8 +510,19 @@ index 00000000..86727841
 +            raw.push((pk, signature));
 +        }
 +        let keygen_ms = keygen_started.elapsed().as_secs_f64() * 1000.0;
-+        let (public_input, witness, signers, preimage) =
++        let (public_input, mut witness, signers, preimage) =
 +            rec_aggregation::prepare_raw_single_message_execution(raw, *message, slot)?;
++        // SIGPRESS_MIN_LOG_ROWS="execution,extension_op,poseidon16" pads the child tables to a fixed
++        // shape so one generated verifier can serve any batch size up to that shape.
++        if let Ok(spec) = std::env::var("SIGPRESS_MIN_LOG_ROWS") {
++            let rows: Vec<usize> = spec.split(',').map(|v| v.trim().parse()).collect::<Result<_, _>>()?;
++            if rows.len() != 3 {
++                return Err("SIGPRESS_MIN_LOG_ROWS needs three comma-separated log sizes".into());
++            }
++            witness.min_table_log_n_rows.insert(lean_vm::Table::execution(), rows[0]);
++            witness.min_table_log_n_rows.insert(lean_vm::Table::extension_op(), rows[1]);
++            witness.min_table_log_n_rows.insert(lean_vm::Table::poseidon16(), rows[2]);
++        }
 +        batches.push(json!({
 +            "side": if side == 0 { "left" } else { "right" },
 +            "batch_root_hex": hex32(message),

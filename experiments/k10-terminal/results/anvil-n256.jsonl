@@ -1,0 +1,8 @@
+{"step":"deploy_verifier","r":{"contractAddress":"0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0","status":"0x1","gasUsed":"0xcda38b","transactionHash":"0xef11acb044ee14c1060930d915d9be75f118c504b49891898804aeb4386cce11","estimate":"13476747"}}
+{"step":"eth_call_verifyC1V1","result":"0x0000000000000000000000000000000000000000000000000000000000000001"}
+{"step":"verify_tx","r":{"status":"0x1","gasUsed":"0xb8a4db","transactionHash":"0x799e40b2926815183190f106f8daae9f784ca4ed51177ac6fdc7b8350176b81b","estimate":"12100827"}}
+{"step":"deploy_gate","r":{"contractAddress":"0x9a676e781a523b5d0c0e43731313a708cb607508","status":"0x1","gasUsed":"0x779bb","transactionHash":"0xf99c8c39edd6ca8106bb12cdfe8cbf9670f2ceb5e0d46c0b8c2a27cd595166e0","estimate":"489915"}}
+{"step":"register","r":{"status":"0x1","gasUsed":"0xc475","transactionHash":"0x9d8514d424af556b00dc546cdaab5e73e4faf33dc8e9bff0500f23fdc9aeb3cf","estimate":"50293"}}
+{"step":"submit_swapped_roots_eth_call","result":"ROOT_MISMATCH"}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0xb9c831","transactionHash":"0x12511dbb9b43c9ce30c0566c9bbee51297b0cf9dcce08a78bfb1113e83babcd6","estimate":"12317538"}}
+{"step":"accepted","result":"true","verifier":"0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0","gate":"0x9a676e781a523b5d0c0e43731313a708cb607508","left":"0xeaad7898beffecdf1307b1d0dcbe59bdac732f75722231629e5886e56ca33a76","right":"0x0ab8a68e4d9be29dbd9ba0c8612285b203a9fb00315823b1e9fb99278a2acf6d"}
