@@ -3,23 +3,26 @@
 //   Beat 2  sign N ops, submit one batch (live tx)
 //   Beat 3  naive vs batch comparison (naive from results.json, or a live naive tx if missing)
 //   Beat 4  tamper: one flipped bit -> challenger finds it off chain -> challenge -> slashed (live txs)
-//   Beat 5  (optional, VALIDITY=1) validity proof: submit a pre-built leanXMSS terminal STARK to the gate (live tx),
-//           plus a tampered-proof eth_call that reverts
+//   Beat 5  the headline: the trustless validity proof (binding v2). A pre-built STARK over 2 x 1024 leanXMSS signers,
+//           each over its own message, submitted to SigpressBindV2Gate in ONE live tx; tamper / wrong-message /
+//           swapped-batch eth_calls revert before it, and a replay eth_call reverts after it. No live proving.
 // Env: N (default 256), BAD_INDEX (default 7), STEP=1 (wait for Enter between beats),
 //      NAIVE=live (send a fresh naive tx instead of reading results.json), RPC_URL, DEPLOYMENTS,
-//      VALIDITY=1 (add Beat 5), PROOF_DIR (proof for Beat 5; default: latest under out/validity/ from `pnpm validity`).
+//      VALIDITY=1|0 (Beat 5 on / off; default: on if a pre-built, not yet accepted proof exists),
+//      VALIDITY_SHAPE (default 2x1024), PROOF_DIR (proof for Beat 5; default: latest fresh one under out/validity/,
+//      made by `SHAPE=2x1024 PROVE_ONLY=1 pnpm validity`).
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { formatEther, hexToBytes, keccak256, parseEventLogs, toBytes, type Hash, type TransactionReceipt } from "viem";
-import { AGG_DIR, getClients, loadDeployments, txLink } from "../src/chain.ts";
+import { AGG_DIR, CHALLENGE_GAS, getClients, loadDeployments, txLink } from "../src/chain.ts";
 import { aggregatorAbi, naiveLaneAbi } from "../src/abi.ts";
 import { buildBatch } from "../src/batch.ts";
 import { keygen, sign, verify } from "../src/wots.ts";
 import { leafOf, messageOf } from "../src/op.ts";
 import { verifyProof } from "../src/merkle.ts";
 import { writeResults } from "../src/results.ts";
-import { latestProofDir, loadTarget, NOT_BOUND, submitProof, type ProofMeta } from "../src/validity.ts";
+import { gateV2Abi, latestProofDir, loadShape, NOT_BOUND, parseShape, readProof, submitProofV2, type ProofMeta } from "../src/validity.ts";
 
 // ---------- terminal styling (plain ANSI, disabled when not a TTY or NO_COLOR is set) ----------
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -116,17 +119,22 @@ const [bond, balance] = await Promise.all([
 ]);
 console.log(dim(`  balance ${formatEther(balance)} MON · bond per batch ${formatEther(bond)} MON`));
 // Beat 5 setup, checked up front so a missing proof or low balance fails before Beat 1.
-const VALIDITY = process.env.VALIDITY === "1";
-const vTarget = VALIDITY ? loadTarget() : undefined;
-const vDir = vTarget ? (process.env.PROOF_DIR ? resolve(process.env.PROOF_DIR) : latestProofDir(vTarget.verifier)) : undefined;
-if (VALIDITY) {
-  if (!vDir || !existsSync(resolve(vDir, "validity-proof.json")) || !existsSync(resolve(vDir, "calldata.bin")))
-    throw new Error(`VALIDITY=1 needs a pre-built proof: run \`pnpm validity\` first or set PROOF_DIR (got ${vDir ?? "none"})`);
+const vShape = parseShape(process.env.VALIDITY_SHAPE, "2x1024");
+const vTarget = process.env.VALIDITY === "0" ? undefined : loadShape(vShape, chainId);
+const isFresh = async (m: ProofMeta) => !(await publicClient.readContract({ address: vTarget!.gate, abi: gateV2Abi, functionName: "accepted", args: [m.commitment] }));
+const vDir = !vTarget ? undefined : process.env.PROOF_DIR ? resolve(process.env.PROOF_DIR) : await latestProofDir(vShape, isFresh);
+const VALIDITY = process.env.VALIDITY === "1" || (process.env.VALIDITY === undefined && !!vDir);
+if (process.env.VALIDITY === "1" && !vDir)
+  throw new Error(`VALIDITY=1 needs a pre-built ${vShape} proof not yet accepted by the gate: run \`SHAPE=${vShape} PROVE_ONLY=1 pnpm validity\` first or set PROOF_DIR`);
+if (VALIDITY && vTarget && vDir) {
+  const { meta } = readProof(vDir);
+  if (!(await isFresh(meta))) throw new Error(`${vDir} was already accepted by the gate (replays revert AlreadyAccepted); prove a fresh one`);
   const gasPrice = await publicClient.getGasPrice();
-  const need = 3n * bond + (gasPrice * 13_500_000n); // ~12.2M-gas submit + 5% + register, plus the beats 1-4 bonds
-  console.log(dim(`  Beat 5: proof ${relative(AGG_DIR, vDir)} · ${vTarget!.shape} verifier ${vTarget!.verifier} · needs ~${formatEther(gasPrice * 13_500_000n)} MON`));
-  if (balance < need) throw new Error(`balance ${formatEther(balance)} MON too low for VALIDITY=1: need ~${formatEther(need)} MON`);
-}
+  const g = meta.shape === "2x1024" ? 23_500_000n : 17_000_000n; // ~estimate + 5% (Monad charges the limit)
+  const need = 3n * bond + gasPrice * g;
+  console.log(dim(`  Beat 5: proof ${relative(AGG_DIR, vDir)} · ${meta.shape} gate ${vTarget.gate} · needs ~${formatEther(gasPrice * g)} MON`));
+  if (balance < need) throw new Error(`balance ${formatEther(balance)} MON too low for Beat 5: need ~${formatEther(need)} MON (or VALIDITY=0)`);
+} else console.log(dim(`  Beat 5 off (${process.env.VALIDITY === "0" ? "VALIDITY=0" : `no pre-built ${vShape} proof that the gate has not accepted yet`})`));
 if (balance < 3n * bond) throw new Error(`balance ${formatEther(balance)} MON too low: need at least ${formatEther(3n * bond)} MON (two bonds + gas). Faucet: https://faucet.monad.xyz`);
 
 // ---------- Beat 1: capacity model ----------
@@ -242,40 +250,45 @@ const challengeTx = await walletClient.writeContract({
   abi: aggregatorAbi,
   functionName: "challenge",
   args: [evilId, op.pkHash, op.m, op.sig, BigInt(bad), proof],
+  gas: CHALLENGE_GAS, // Monad's estimate for challenge is ~2.5M vs <=188k executed; fixed cap (charged on the limit)
 });
 const chReceipt = await confirm("challenge", challengeTx);
 const slashedEv = parseEventLogs({ abi: aggregatorAbi, logs: chReceipt.logs, eventName: "BatchSlashed" });
 const onchain = await publicClient.readContract({ address: d.aggregator, abi: aggregatorAbi, functionName: "batches", args: [evilId] });
 const slashed = onchain[4] && slashedEv.length > 0;
 if (!slashed) throw new Error(`batch ${evilId} not marked slashed after challenge ${challengeTx}`);
-console.log(`\n  ${bold(color ? "\x1b[41;97m BATCH REJECTED, bond slashed \x1b[0m" : "BATCH REJECTED, bond slashed")}  ${dim(`batch #${evilId}, ${formatEther(bond)} MON to the challenger`)}`);
+console.log(`\n  ${bold(color ? "\x1b[41;97m BATCH REJECTED, bond slashed \x1b[0m" : "BATCH REJECTED, bond slashed")}  ${dim(`batch #${evilId}: half the ${formatEther(bond)} MON bond to the challenger, the rest burnt`)}`);
 console.log(`  the contract re-ran WOTS verify on chain for that one signature (${fmt(Number(chReceipt.gasUsed))} gas charged)`);
 console.log(`  ${cyan(txLink(explorer, challengeTx))}`);
 console.log(dim(`  "One bad signature, the whole batch rejected — on chain, not on trust."`));
 stage.tamper = { submitTx: evilTx, challengeTx, batchId: Number(evilId), badIndex: bad, slashed, challengeGas: Number(chReceipt.gasUsed), checkMs: Math.round(checkMs), at: new Date().toISOString() };
 writeResults({ tamper: { submitTx: evilTx, challengeTx, slashed }, stage });
 
-// ---------- Beat 5 (optional): validity proof ----------
+// ---------- Beat 5: the trustless validity proof ----------
 if (VALIDITY && vTarget && vDir) {
   await pause("Beat 5 (validity proof)");
-  beat(5, "Validity proof: many PQ signatures, ONE STARK, ONE tx", LIVE);
-  const meta = JSON.parse(readFileSync(resolve(vDir, "validity-proof.json"), "utf8")) as ProofMeta;
-  console.log(`  ${bold(fmt(meta.signatures))} leanXMSS signatures (2 batches x ${fmt(meta.perChild)}, each batch signs its 32-byte root)`);
+  const { meta } = readProof(vDir);
+  beat(5, `${fmt(meta.signatures)} post-quantum signatures, ONE STARK, ONE tx, no trusted party`, LIVE);
+  console.log(`  ${bold(fmt(meta.signatures))} leanXMSS signers (2 batches x ${fmt(meta.perChild)}), ${bold("each over its own 32-byte message")}${meta.distinctMessages ? dim(" (all distinct)") : ""}`);
+  console.log(`  ${dim(meta.source === "sdk" ? "fresh user keys from the TS SDK; each signed its own op hash" : "prover-generated test keys, one message per signer")}`);
   console.log(`  proved off chain ${dim(`before the demo (${meta.createdAt}${meta.proveSeconds ? `, ${meta.proveSeconds} s wall on a 16 GB M4` : ""}) — not proved live`)}`);
   console.log(dim(`  leanVM aggregation x2 -> lift x2 -> Keccak terminal root proof (${fmt(meta.terminalProofBytes ?? 0)} B) -> generated Solidity verifier`));
-  const v = await submitProof(clients, vDir, vTarget, (s) => console.log(dim(`  ${s}`)));
-  console.log(`  ${green("✓")} gate.submit: verifier ran the full STARK check on chain, accepted=${v.accepted}`);
+  console.log(dim(`  the gate rebuilds the proof's statement from the ${fmt(meta.signatures)} raw pubkeys + messages in calldata (no registrar)`));
+  const v = await submitProofV2(clients, vDir, vTarget, (s) => console.log(dim(`  ${s}`)));
+  console.log(`  ${green("✓")} gate.submit: STARK verified and bound to every (pubkey, message) on chain, accepted=${v.accepted}`);
   console.log(`  ${cyan(txLink(explorer, v.txHash))}`);
-  console.log(`  gas charged ${bold(fmt(v.gasCharged))} ${dim(`(estimate ${fmt(v.gasEstimate)} + 5%; Monad charges the limit)`)} · calldata ${bold(`${fmt(v.calldataBytes)} B`)}`);
-  console.log(`  per signature: ${bold(green(`${fmt(v.gasPerSignature)} gas`))} and ${bold(green(`${fmt(v.bytesPerSignature, 1)} B`))} ${dim(`(cost is ~flat in N: one proof covers up to 2 x ${vTarget.maxPerChild})`)}`);
+  console.log(`  gas charged ${bold(fmt(v.gasCharged))} ${dim(`(estimate ${fmt(v.gasEstimate)} + 5%; Monad charges the limit)`)} · calldata ${bold(`${fmt(v.calldataBytes)} B`)} · ${bold("1 tx")}`);
+  console.log(`  per signature: ${bold(green(`${fmt(v.gasPerSig)} gas`))} and ${bold(green(`${fmt(v.bytesPerSig, 1)} B`))} ${dim("(the ~12M verifier is flat; binding adds ~3-4k gas and 64 B per signer)")}`);
   if (naive) console.log(dim(`  vs naive WOTS on chain: ${fmt(naive.gasUsed)} gas and ${fmt(naive.calldataBytes)} B per signature`));
-  console.log(`  tampered proof (1 bit flipped at byte ${fmt(v.tamper.flippedByte)}) via eth_call: ${red(`REVERTS ${v.tamper.reason}`)}`);
-  if (v.replay) console.log(dim(`  note: this proof was already accepted earlier; this research gate does not block re-submission.`));
-  console.log(`\n  ${bold(yellow("Bound by the proof:"))} both batches' signer sets, both batch roots and the slot (inside the application root).`);
-  console.log(`  ${bold(yellow("Not bound yet:"))}`);
+  for (const n of v.negatives) {
+    const what = { "tampered-proof": "1 bit flipped in the proof", "wrong-message": "one signer's message changed", "wrong-signer": "one pubkey changed", "swap-batches": "the two batches swapped", "wrong-slot": "slot + 1", "wrong-commitment": "prover commitment changed", replay: "same submit again (replay)", "": "unmodified" }[n.name];
+    console.log(`  ${pad(what ?? n.name, 34)} eth_call: ${n.reverted ? red(`REVERTS ${n.reason}`) : yellow("did not revert")}`);
+  }
+  console.log(`\n  ${bold(yellow("Bound on chain:"))} slot, every signer's pubkey, every signer's own message, order and count, both batches.`);
+  console.log(`  ${bold(yellow("Not bound / limits:"))}`);
   for (const n of NOT_BOUND) console.log(dim(`   - ${n}`));
-  stage.validity = { txHash: v.txHash, gasCharged: v.gasCharged, signatures: v.signatures, proofDir: relative(AGG_DIR, vDir), tamperReason: v.tamper.reason, at: v.at };
-  writeResults({ validity: { ...v, proofDir: relative(AGG_DIR, vDir) }, stage });
+  stage.validity = { txHash: v.txHash, gasCharged: v.gasCharged, gasPerSig: v.gasPerSig, bytesPerSig: v.bytesPerSig, signatures: v.signatures, shape: v.shape, proofDir: relative(AGG_DIR, vDir), negatives: v.negatives, at: v.at };
+  writeResults({ validityStage: { ...v, proofDir: relative(AGG_DIR, vDir) }, stage });
 }
 stage.finishedAt = new Date().toISOString();
 writeResults({ stage });
