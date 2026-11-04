@@ -186,3 +186,18 @@ scheme; (5) missing LICENSE file. Effort estimate (not measured): 1-2 weeks if t
 obtainable; 4+ weeks otherwise.
 **K4 status:** local anvil data point passes the gas/size bar for the authors' fixture proof; Monad
 testnet run and a proof of our own statement are still to do. K4 is not yet passed.
+
+## K4 — real hash-based proof verified on Monad testnet (4 Nov 2026)
+
+- **Test:** deploy K3's chosen verifier (sol-spartan-whir LeanVM terminal, KoalaBear + Keccak, no
+  pairings, no Poseidon in the EVM) to Monad testnet and verify its fixture proof in one transaction.
+- **Measured:** verifier deploys (≈62.7 KB, fits MIP-2's 128 KB; would not deploy on Ethereum).
+  Verify tx `0x3ab6054a444f6f52bc4054ccbfc2b621dfc91564ba324de62c4ab9cc8fec968c` **succeeded**; proof
+  calldata **106,628 B**; `eth_estimateGas` **12,837,028**; charged 13,500,000 (Monad charges the limit).
+  A 1-bit tampered proof reverts (`MERKLE_ROOT`). Details: `experiments/k4/README.md`.
+- **Decision: K4 PASS** on the bar in `plan.md` (≤ 25M gas, one tx, ≤ 300 KiB). Max tx size is still
+  unverified, but a 104 KiB tx was accepted. **Caveat:** the statement proven is the fixture, not our
+  signature batch; producing that proof (terminal prover, public input bound to our batch root,
+  leanXMSS vs our WOTS) is the remaining work — K3 estimates 1-2 weeks if the terminal prover is
+  obtainable, 4+ otherwise (estimate, not measured). Go/no-go: full validity-proof version is
+  **go on gas/size grounds**; the risk has moved to prover availability.
