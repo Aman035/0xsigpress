@@ -11,6 +11,7 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built at](https://img.shields.io/badge/built%20at-Monad%20Blitz-111)](https://blitz.devnads.com)
 [![Status](https://img.shields.io/badge/optimistic-live%20on%20testnet-35D07F)](docs/decisions.md)
+[![Demo](https://img.shields.io/badge/demo-live-836EF9)](https://aman035.github.io/sigpress/)
 
 </div>
 
@@ -89,7 +90,7 @@ cd aggregator && pnpm install && pnpm test
 ./scripts/testnet.sh
 ```
 
-🔗 **Live demo page:** _add the GitHub Pages URL here once Pages is enabled (Settings → Pages → GitHub Actions)._
+🔗 **Live demo page: https://aman035.github.io/sigpress/**
 
 ---
 
