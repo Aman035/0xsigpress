@@ -1,52 +1,52 @@
 {
   "naive": {
-    "txHash": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
-    "gasUsed": 143278,
+    "txHash": "0xf026c92c2db1246fb8ebd0e9f9966a17865aee2feebedcb4adde956d23666ca6",
+    "gasUsed": 147218,
     "calldataBytes": 2276
   },
   "batch": {
-    "txHash": "0xe225986bb088f07e1cd63e6ee95c63cc7df83dd8056018cdaafdf2d7ede07098",
-    "gasUsed": 110494,
+    "txHash": "0x70a8abeae972c1ddc4e9455c56de51166efe8200a1e9702784328754da803c0b",
+    "gasUsed": 133658,
     "count": 256,
-    "root": "0x3bf1d9f7be12116f4ed94de73ce6ac8a9bfbd99043597af6837e50d4c0544908",
+    "root": "0x29b9a85ed0eefa20adb9d61a6ac2072a31e05edee947fca15a88dedf46f6a061",
     "bytesPerOp": 0.890625
   },
   "tamper": {
-    "submitTx": "0xb866f8688041568a9ef694296302491e9558fd47c0a91d468e0441c4be95e62c",
-    "challengeTx": "0x7dae037aaa41696b8d2053b0fd333f35b4f107c966b81362b4d5197d61e873d8",
+    "submitTx": "0xb041d1a1608822b80a52346b36c76235741e9894d809f749e864ea5cfc0c42b8",
+    "challengeTx": "0x491ef40b727aaa0a13d3e093eb0d073b496b2d3da689156705ba09ae6d234ce0",
     "slashed": true
   },
   "execute": {
     "batchId": 2,
-    "submitTx": "0x841abb79cdfea8b77bebee78e2e6edaacdc2ee6bae2d5b89dbdf90cb9373e619",
-    "finalizeTx": "0x39ae3d50a99795c8d39670b37e00e0aa18262099433680b1cadedfdbddb71e3a",
+    "submitTx": "0x3171ccbc98131f1504254f0ad95487bba8c3111ceb818a1512e4635813cf24a3",
+    "finalizeTx": "0x729e810129f46162eb132cae5e865ad37fab3b9f84882e4ef596ea102db099c6",
     "executeTxs": [
       {
-        "account": "0x3d0f54BFD21Fbbf8CCd2D48E57310d15915d5Eaa",
-        "txHash": "0xc3a6411d33ed43ea9c013a7ee387cef064ef7d3ca3e26f1ce7b88604e98c9353",
-        "gasUsed": 158267
+        "account": "0x85ed306b118C5e99cf70FB4d53e7bfef08ECcb9f",
+        "txHash": "0xd18845df163bc39b2f8e750d31c1bd43d6fc4edac2f63991aaa4d451a01a99f4",
+        "gasUsed": 127431
       },
       {
-        "account": "0xDe48Aad1590A903e358D8aE08fA29813380c5B5f",
-        "txHash": "0xcc3153c0fc03f38a2301b7125f43db3cbafb66735d9ca095c97f1843238ca031",
-        "gasUsed": 126760
+        "account": "0x0955D5005f9459560fE0e5ed120f7263e68Ce210",
+        "txHash": "0xb367b3edff1512558826920acc571dd58bbee74f544748d54db6c112698cd14d",
+        "gasUsed": 127450
       },
       {
-        "account": "0xaBE00be3EB0b604a19424025a42E81c6C4fE0fb8",
-        "txHash": "0xd67f2b33f6e7db6c4acfdc1727b596cb32479f7ec521e8f61199207328e533f2",
-        "gasUsed": 126760
+        "account": "0x24c1b9538Fd72065f188caeFA6A96f53208F7bcF",
+        "txHash": "0x790f89f6dcce106f1c224476bb7ba789ea6fddc85072cab2705e6accd3f45352",
+        "gasUsed": 127450
       },
       {
-        "account": "0xF4cfd46a47B0124F3Cd0F2818476D8e730aa4Db5",
-        "txHash": "0x5ea3a7550c9d7911d6de8bf027098ff6faff73b9b9626dcf95412bcad23dc5d9",
-        "gasUsed": 126748
+        "account": "0xa3774203F1a2e71e1c9EfE340D2b6FB3e25b876D",
+        "txHash": "0x487ed414968aca99c11d8dca9359d0b2bc78433f713c4603c9ca0874832c7b46",
+        "gasUsed": 127454
       }
     ],
-    "gasPerExecute": 134634,
+    "gasPerExecute": 127446,
     "recipient": "0x3f1FB19d9826Cb72949FA4efa1e37503DEaAb2Fb",
     "amountEach": "0.0001",
-    "directTx": "0x9b690e18962beaa97859fae38a063b8f17aa68d718844ef6d4b1eee3159ae2c6",
-    "directGas": 186088
+    "directTx": "0x80a51e74f0ff05a4077cf3b798c8506215bc8adfcc088a30dcaab4d746f26a6f",
+    "directGas": 193142
   },
   "stage": {
     "startedAt": "2026-11-04T09:44:18.380Z",
