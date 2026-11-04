@@ -49,8 +49,10 @@ export async function getClients(opts: { rpc?: string; privateKey?: Hex; keyVar?
     rpcUrls: { default: { http: [rpc] } },
     blockExplorers: isMonad ? { default: { name: "Monad Explorer", url: MONAD_EXPLORER } } : undefined,
   });
-  const publicClient = createPublicClient({ chain, transport: http(rpc) });
-  const raw = createWalletClient({ chain, account, transport: http(rpc) });
+  // Shared public RPCs rate-limit (HTTP 429); RPC_RETRY_COUNT / RPC_RETRY_DELAY_MS widen viem's retry backoff.
+  const transport = http(rpc, { retryCount: Number(process.env.RPC_RETRY_COUNT ?? 3), retryDelay: Number(process.env.RPC_RETRY_DELAY_MS ?? 150) });
+  const publicClient = createPublicClient({ chain, transport });
+  const raw = createWalletClient({ chain, account, transport });
   // Monad's RPC gas estimates can come back too tight (a first-run submitBatch ran out of gas on
   // testnet), so every contract write gets a 30% gas buffer unless the caller sets gas itself.
   const writeContract = (async (args: any) => {
