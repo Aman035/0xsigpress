@@ -122,8 +122,6 @@ Three reasons, each now backed by a measurement, not a claim:
   per op — **~134,634 gas/execute**.
 - **Standard 4337 holds (K8):** a 4-op aggregated bundle runs through `handleAggregatedOps` on the real
   v0.8 EntryPoint on Monad testnet (**828,003 gas**), via a custom `IAggregator`.
-- **Compact bundle (K9 fix):** a `SigpressEntry` that recomputes the root on chain brings per-op cost to
-  **98 bytes/op at N=128** on testnet — 0.25–0.32× a normal Monad tx.
 
 **Validity-proof path — proven feasible:**
 - **Verifier (K4):** a hash-based STARK verifier (sol-spartan-whir, KoalaBear + Keccak, no pairings,

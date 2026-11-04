@@ -137,7 +137,7 @@ BEAT 2  Sign 256 post-quantum ops, put ONE batch on chain  [LIVE on Monad testne
   submitBatch https://testnet.monadexplorer.com/tx/0x1078…
   gas charged 110,494 (432 gas/op) · calldata 228 B → 0.89 B/op
 BEAT 3  Naive post-quantum vs Sigpress batch  [LIVE on Monad testnet]
-  bytes on chain per op      2,276 B   vs   0.89 B
+  bytes on chain per op      2,276 B   vs   98 B (whole executed op; 0.89 B is only the root share)
 BEAT 4  Flip ONE bit in ONE of 256 signatures  [LIVE on Monad testnet]
   challenger re-checks all 256 signatures off chain in ~40 ms → signature #7 is INVALID
   BATCH REJECTED, bond slashed
