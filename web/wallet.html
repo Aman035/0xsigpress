@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sigpress wallet — post-quantum transfers on Monad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#f5f5f9; --panel:#ffffff; --ink:#17152a; --dim:#6b6880; --line:#e7e5f0;
+    --purple:#6b4ef2; --purple-soft:#ede9fe; --rose:#d83a5e; --rose-soft:#fbe6ec; --good:#179c6a;
+    --sans:"Space Grotesk",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){ :root{ --paper:#100e1a; --panel:#171523; --ink:#eceaf6; --dim:#9995b4; --line:#2a2740; --purple:#9a84ff; --purple-soft:#241f3d; --rose:#ff6b8a; --rose-soft:#2d1520; --good:#35d08a; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:400 16px/1.5 var(--sans); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1060px; margin:0 auto; padding:0 20px 64px; }
+  a { color:var(--purple); text-decoration:none; } a:hover { text-decoration:underline; }
+  .mono { font-family:var(--mono); }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 0; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+  .brand { font-weight:700; font-size:20px; letter-spacing:-0.02em; } .brand span { color:var(--purple); }
+  .chip { font:500 12px/1 var(--mono); color:var(--dim); display:inline-flex; align-items:center; gap:7px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--dim); } .dot.ok { background:var(--good); } .dot.bad { background:var(--rose); }
+
+  .cols { display:grid; grid-template-columns:340px 1fr; gap:28px; margin-top:26px; }
+  @media (max-width:820px){ .cols { grid-template-columns:1fr; } }
+  h2 { font:600 12px/1 var(--sans); letter-spacing:0.13em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
+
+  .acct { border:1px solid var(--line); border-radius:11px; padding:13px 14px; margin-bottom:10px; cursor:pointer; background:var(--panel); }
+  .acct.sel { border-color:var(--purple); box-shadow:0 0 0 1px var(--purple); }
+  .acct .a { font:600 14px/1 var(--mono); }
+  .acct .b { display:flex; justify-content:space-between; margin-top:7px; font-size:13px; color:var(--dim); }
+  .acct .b b { color:var(--ink); font-family:var(--mono); }
+
+  .composer { border:1px solid var(--line); border-radius:11px; padding:16px; background:var(--panel); margin-top:16px; }
+  label { display:block; font-size:12px; color:var(--dim); margin:10px 0 5px; }
+  input { width:100%; font:500 14px var(--mono); color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:9px 11px; }
+  .btn { width:100%; font:600 15px var(--sans); color:#fff; background:var(--purple); border:0; border-radius:8px; padding:12px; cursor:pointer; margin-top:14px; }
+  .btn:hover { filter:brightness(1.07); } .btn:disabled { opacity:.5; cursor:default; }
+  .btn.ghost { background:transparent; color:var(--rose); border:1px solid var(--line); margin-top:9px; }
+  .recipient { margin-top:14px; font-size:13px; color:var(--dim); } .recipient b { color:var(--ink); font-family:var(--mono); }
+
+  .feed { min-height:200px; }
+  .empty { color:var(--dim); font-size:15px; padding:28px 0; }
+  .op { border:1px solid var(--line); border-radius:13px; background:var(--panel); margin-bottom:18px; overflow:hidden; }
+  .op > .oph { display:flex; justify-content:space-between; align-items:baseline; padding:14px 16px; border-bottom:1px solid var(--line); gap:12px; flex-wrap:wrap; }
+  .op > .oph .t { font-weight:600; } .op > .oph .t small { color:var(--dim); font-weight:400; font-family:var(--mono); }
+  .op > .oph .s { font:600 12px/1 var(--mono); padding:5px 9px; border-radius:6px; background:var(--purple-soft); color:var(--purple); }
+  .op > .oph .s.exec { background:color-mix(in srgb,var(--good) 16%,transparent); color:var(--good); }
+  .op > .oph .s.fail { background:var(--rose-soft); color:var(--rose); }
+
+  .phase { display:grid; grid-template-columns:26px 1fr; gap:0 13px; padding:14px 16px; border-bottom:1px solid var(--line); opacity:.45; }
+  .phase:last-child { border-bottom:0; } .phase.on, .phase.done { opacity:1; }
+  .pico { width:18px; height:18px; margin-top:2px; border-radius:50%; border:2px solid var(--line); position:relative; }
+  .phase.on .pico { border-color:var(--purple); border-right-color:transparent; animation:spin .7s linear infinite; }
+  .phase.done .pico { border-color:var(--good); background:var(--good); }
+  .phase.done .pico::after { content:""; position:absolute; left:4.5px; top:1px; width:4px; height:9px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .phase.fail .pico { border-color:var(--rose); background:var(--rose); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .phase .pt { font-weight:600; font-size:15px; }
+  .phase .pn { color:var(--dim); font-size:13px; margin:3px 0 0; }
+  .kv { margin:10px 0 0; display:grid; grid-template-columns:auto 1fr; gap:5px 14px; font-size:12.5px; }
+  .kv dt { color:var(--dim); } .kv dd { margin:0; font-family:var(--mono); word-break:break-all; }
+  .kv dd .slash { color:var(--rose); font-weight:700; } .kv dd a { color:var(--purple); }
+  @media (prefers-reduced-motion: reduce){ .phase.on .pico { animation:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span>Sig</span>press wallet</div>
+    <div class="chip"><span class="dot" id="svcDot"></span><span id="svcTag">connecting to the aggregator…</span></div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h2>Your post-quantum accounts</h2>
+      <div id="accts"></div>
+      <div class="composer">
+        <label for="amt">Amount (MON)</label>
+        <input id="amt" value="0.0001" />
+        <button class="btn" id="sendBtn" disabled>Send a post-quantum transfer</button>
+        <button class="btn ghost" id="forgeBtn" disabled>Forge a bad op (watch it get rejected)</button>
+        <div class="recipient">to <b id="recip">…</b></div>
+      </div>
+    </div>
+
+    <div>
+      <h2>What happens on Monad</h2>
+      <div class="feed" id="feed"><div class="empty">Pick an account and send a transfer. Each step below shows the real signature, the batch root, and every transaction on Monad testnet.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let STATE = null, SEL = 0, EX = "";
+const $ = id => document.getElementById(id);
+const short = h => !h ? "—" : (h.length>22 ? h.slice(0,12)+"…"+h.slice(-8) : h);
+const api = async (path, opts) => { const r = await fetch(path, opts); return { status:r.status, body: await r.json().catch(()=>({})) }; };
+const tx = h => h ? `<a href="${EX}/tx/${h}" target="_blank" rel="noopener">${short(h)}</a>` : "—";
+const addr = h => h ? `<a href="${EX}/address/${h}" target="_blank" rel="noopener">${short(h)}</a>` : "—";
+
+async function loadState(){
+  const { status, body } = await api("/api/state");
+  if (status!==200){ $("svcTag").textContent = "aggregator not reachable — start `pnpm service`"; $("svcDot").className="dot bad"; return; }
+  STATE = body; EX = body.explorer || "";
+  $("svcDot").className = "dot ok";
+  $("svcTag").innerHTML = `aggregator live · chain ${body.chainId} · entry <span class="mono">${short(body.entry)}</span>`;
+  $("recip").innerHTML = addr(body.recipient) + "  (balance " + Number(body.recipientBalance).toFixed(5) + " MON)";
+  $("accts").innerHTML = body.accounts.map((a,i)=>`
+    <div class="acct ${i===SEL?"sel":""}" data-i="${i}">
+      <div class="a">Account #${a.index}</div>
+      <div class="b"><span>${addr(a.address)}</span><b>${Number(a.balance).toFixed(5)} MON</b></div>
+      <div class="b"><span>one-time key index</span><b>${a.nonce}</b></div>
+    </div>`).join("");
+  document.querySelectorAll(".acct").forEach(el=>el.onclick=()=>{ SEL=Number(el.dataset.i); loadState(); });
+  $("sendBtn").disabled = false; $("forgeBtn").disabled = false;
+}
+
+// --- render one op's phases, filling in detail as the service advances it ---
+function phases(op){
+  const s = op.sign, v = op.view, b = v?.batch || {};
+  const at = n => ({pending:0,queued:1,batched:2,finalized:3,executed:4,failed:9})[n] ?? 0;
+  const st = v?.status || "queued";
+  const reached = st==="failed" ? 1 : at(st);
+  const P = [
+    { k:"sign", t:"Signed in your wallet", n:"A post-quantum one-time key signs this transfer. The key rotates after one use — it can never sign twice.",
+      rows:[["key index (nonce)", s.nonce],["one-time public key", short(s.pkHash)],["signed message", short(s.message)],
+            ["signature", `${short(s.sig)} <span style="color:var(--dim)">(${s.sigBytes.toLocaleString()} bytes)</span>`],
+            ["rotates to", short(s.nextPkHash)],["batch leaf", short(s.leaf)]] },
+    { k:"queued", t:"Aggregator checked and queued it", n:"The aggregator verified the signature off chain and added the op to its queue. It never sees your key.",
+      rows:[["op id", short(op.id)],["status", st]] },
+    { k:"batched", t:"Folded into one batch on Monad", n:"Your op plus others become a single 32-byte Merkle root, posted on chain with a bond. The signatures stay off chain.",
+      rows:[["batch", b.id!=null?`#${b.id}`:"—"],["ops in batch", b.count ?? "—"],["batch root", short(b.root)],["submitBatch", tx(b.submitTx)]] },
+    { k:"finalized", t:"Challenge window passed", n:"Anyone could fetch the batch's signatures and challenge a bad one during the window. None was. The batch is finalized.",
+      rows:[["finalize", tx(b.finalizeTx)]] },
+    { k:"executed", t:"Executed on Monad", n:"The whole batch ran in one transaction; your transfer went through for about 98 bytes on chain.",
+      rows:[["executeBundle", tx(b.executeTx || v?.txHash)],["call succeeded", v?.callSuccess===false?'<span class="slash">no</span>':"yes"]] },
+  ];
+  const badge = st==="executed" ? '<span class="s exec">executed</span>' : st==="failed" ? '<span class="s fail">failed</span>' : `<span class="s">${st}</span>`;
+  const body = P.map((ph,i)=>{
+    const cls = reached>i ? "done" : reached===i ? "on" : "";
+    const show = reached>=i;
+    const rows = show ? `<dl class="kv">${ph.rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]??"—"}</dd>`).join("")}</dl>` : "";
+    return `<div class="phase ${cls}"><div class="pico"></div><div><div class="pt">${ph.t}</div><div class="pn">${ph.n}</div>${rows}</div></div>`;
+  }).join("");
+  const err = st==="failed" ? `<div class="phase fail"><div class="pico"></div><div><div class="pt">Failed</div><div class="pn mono">${v?.error||""}</div></div></div>` : "";
+  return `<div class="oph"><div class="t">Transfer <small>${op.amount} MON → ${short(op.to)}</small></div>${badge}</div>${body}${err}`;
+}
+
+const OPS = [];
+function renderFeed(){
+  $("feed").innerHTML = OPS.length ? OPS.map((o,i)=>`<div class="op" id="op${i}">${phases(o)}</div>`).join("") :
+    `<div class="empty">Pick an account and send a transfer.</div>`;
+}
+async function poll(op){
+  for (let i=0;i<120;i++){
+    const { status, body } = await api(`/api/op/${encodeURIComponent(op.id)}`);
+    if (status<400){ op.view = body; renderFeed(); if (body.status==="executed"||body.status==="failed"){ loadState(); return; } }
+    await new Promise(r=>setTimeout(r,1500));
+  }
+}
+
+$("sendBtn").onclick = async () => {
+  const a = STATE.accounts[SEL]; const amount = $("amt").value.trim();
+  $("sendBtn").disabled = true;
+  const { status, body } = await api("/api/send", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ fromIndex:a.index, amount }) });
+  $("sendBtn").disabled = false;
+  if (status!==200){ alert("Send failed: "+(body.error||status)); return; }
+  const op = { id:body.id, sign:body.sign, to:body.to, amount, view:{ status:body.status||"queued" } };
+  OPS.unshift(op); renderFeed(); poll(op);
+};
+$("forgeBtn").onclick = async () => {
+  const a = STATE.accounts[SEL];
+  $("forgeBtn").disabled = true;
+  const { body } = await api("/api/forge", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ fromIndex:a.index }) });
+  $("forgeBtn").disabled = false;
+  const op = { id:"forged", amount:"0.0001", to:STATE.recipient,
+    sign:{ nonce:a.nonce, pkHash:"(flipped one bit of a valid signature)", message:"—", sig:"0x…(tampered)", sigBytes:2144, nextPkHash:"—", leaf:"—" },
+    view:{ status:"failed", error:`Aggregator rejected it (HTTP ${body.httpStatus}): ${body.error}` } };
+  OPS.unshift(op); renderFeed();
+};
+
+loadState();
+setInterval(()=>{ if (STATE) loadState(); }, 8000);
+</script>
+</body>
+</html>
