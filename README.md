@@ -108,30 +108,51 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 
 ## Try it
 
-**Live demo page: https://sumithprabhu.github.io/sigpress/**
+**Live demo page (animated run, shareable): https://sumithprabhu.github.io/sigpress/**
+
+### Interactive wallet — send a real post-quantum transfer on Monad testnet
+
+A browser wallet that sends real transfers through the aggregator service to Monad, showing every phase
+(the one-time key, the signed message, the 2,144-byte signature, the batch root, and every tx). Needs a
+funded key in the root `.env` (`PRIVATE_KEY_K13`).
+
+All commands run from `aggregator/`, so each line below `cd`s there first.
 
 ```sh
-# Demo page locally (two capacity lanes + scoreboard + live explorer links)
-cd web && python3 -m http.server 8080   # then open http://localhost:8080
+cd aggregator && pnpm install                            # first time only
 
-# Contracts & aggregator
-cd contracts && forge test
-cd aggregator && pnpm install && pnpm test
+# terminal 1 — the aggregator service (fast 8-second window instance baked in)
+cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm wallet:service   # wait for http://127.0.0.1:8547
 
-# One-shot testnet deploy + demo (needs a funded PRIVATE_KEY in .env)
-./scripts/testnet.sh
+# terminal 2 — the wallet (serves the UI, signs, relays) — start AFTER the service is up
+cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm wallet      # then open http://127.0.0.1:8550
+```
+
+Open **http://127.0.0.1:8550**, pick a post-quantum account, and send. Watch it go signed → queued →
+batched on Monad → finalized → executed, with live explorer links; "Forge a bad op" shows the aggregator
+reject a tampered signature. Full guide and env in [`docs/wallet-demo.md`](docs/wallet-demo.md). For the
+on-chain slash of a withheld/dishonest batch, also run `KEY_VAR=PRIVATE_KEY_K13 DA_URL=http://127.0.0.1:8547 pnpm watchtower`
+and `KEY_VAR=PRIVATE_KEY_K13 pnpm service:tamper`.
+
+### Tests and the one-shot CLI demo
+
+```sh
+cd contracts && forge test                    # 93 Solidity tests
+cd aggregator && pnpm install && pnpm test    # TS tests
+./scripts/testnet.sh                          # one-shot: deploy + batch + tamper on testnet
 ```
 
 ---
 
 ## How it works
 
-Users keep signing every operation with a post-quantum key. The aggregator batches those operations and
+Users keep signing every operation with a hash-based one-time post-quantum key (**WOTS**, Winternitz
+one-time signatures over Keccak-256). The aggregator batches those operations and
 gives Monad **one thing to check** instead of thousands of signatures, on either of two paths:
 
 ```mermaid
 flowchart LR
-  U["User wallet<br/>signs each op with a<br/>post-quantum key"] --> AGG["Aggregator<br/>collects a batch of<br/>signed operations"]
+  U["User wallet<br/>signs each op with a one-time<br/>post-quantum key (WOTS, hash-based)"] --> AGG["Aggregator<br/>collects a batch of<br/>signed operations"]
   AGG -->|"optimistic path:<br/>32-byte root + bond"| OPT["Monad: OptimisticAggregator<br/>anyone can challenge a bad<br/>signature and slash the bond"]
   AGG -->|"validity path:<br/>one hash-based STARK"| STK["Monad: STARK verifier<br/>checks all N signatures<br/>in a single transaction"]
   OPT --> EXE["PQ account executes<br/>from a finalized batch"]
@@ -164,7 +185,10 @@ flowchart LR
    chain; on a throughput chain that's the binding constraint, which is exactly what aggregation removes.
 2. **The verifier fits *and* is cheap (measured).** Our STARK verifier is **62.7 KB: it deploys under
    Monad's 128 KB limit but would *not* fit Ethereum's 24 KB**, and a proof verifies for **~12.84M gas**
-   (Monad gives 30M gas *per tx*; Ethereum gives 30M per *block*).
+   (Monad gives 30M gas *per tx*; Ethereum gives 30M per *block*). It's live on Monad testnet at
+   [`0x4fa20bd7…c4be`](https://testnet.monadexplorer.com/address/0x4fa20bd740deb7969416749dbedb5d8e5b65c4be)
+   ([verify tx, ~12.84M gas](https://testnet.monadexplorer.com/tx/0x3ab6054a444f6f52bc4054ccbfc2b621dfc91564ba324de62c4ab9cc8fec968c));
+   it is generated `sol-spartan-whir` code, so it shows as unverified bytecode on the explorer.
 3. **The rails and the gap are already here.** ERC-4337, EIP-7702 and a P-256 precompile are deployed, and
    Monad's roadmap leaves the size question open. We ship it at the **app layer, today.**
 
@@ -180,10 +204,10 @@ flowchart LR
 - **The validity proof is a working prototype, not the shipped path yet.** It already verifies real
   signature batches on Monad, and it now binds trustlessly: the contract recomputes the batch from the
   signers and their per-operation messages on chain (no trusted helper), and swapped batches, changed
-  messages or tampered proofs revert. What still needs hardening is scale and production fit: the on-chain
-  binding hash is expensive (about 105 signers per transaction today), the prototype still uses a research
-  key format rather than our production accounts, and proving a batch takes about a minute. Until those
-  close, the live product path stays the simpler optimistic one.
+  messages or tampered proofs revert. It also scales: binding v2 verifies **2,048 signatures with distinct
+  messages in one Monad transaction** (~3.2k gas per signer). What still needs hardening is production fit:
+  the prototype uses a research key format rather than our production accounts, and proving a batch takes
+  about a minute. Until those close, the live product path stays the simpler optimistic one.
 - **Keys are single-use.** Hash-based signatures use one-time keys, so the wallet rotates to a fresh key
   on every operation and never reuses one.
 - **Every figure is real.** Each number is measured on Monad testnet with a transaction you can open, or

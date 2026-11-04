@@ -323,8 +323,9 @@ function paintStatic(res){
     <div class="val">${x.v}${x.g?`<span class="sec">${x.g}</span>`:""}${x.tx?`<a class="proof" href="${EX}/tx/${x.tx}" target="_blank" rel="noopener">${shortHash(x.tx)}</a>`:`<span class="proof" style="color:var(--dim)">run the demo</span>`}</div></div>`).join("");
 
   const limits = [
-    "The STARK path is the headline; the optimistic path (bonded challenge) stays as the fallback and runs the live demo above.",
-    "Proving a batch takes about a minute on a laptop, so the stage submits a proof built beforehand.",
+    "The STARK path is the headline: the contract recomputes the batch from the signers and their per-operation messages on chain, no trusted helper.",
+    "It scales: 2,048 signatures with distinct messages verify in one Monad transaction (~3.2k gas per signer for binding).",
+    "Proving a batch takes about a minute on a laptop, so the stage submits a proof built beforehand; the optimistic path (bonded challenge) stays as the fallback.",
     "The prototype uses a research key format (leanXMSS over KoalaBear), not our production post-quantum accounts yet."
   ];
   document.getElementById("limits").innerHTML = limits.map(t=>`<li>${t}</li>`).join("");

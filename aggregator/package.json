@@ -21,7 +21,8 @@
     "watchtower": "tsx src/service/watchtower.ts",
     "service:demo": "tsx scripts/service-demo.ts",
     "service:tamper": "tsx scripts/service-tamper.ts",
-  "wallet": "tsx scripts/wallet-server.ts"
+    "wallet": "tsx scripts/wallet-server.ts",
+    "wallet:service": "SERVICE_DEPLOYMENTS=deployments-wallet.json tsx src/service/server.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
@@ -31,5 +32,6 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
-  }
+  },
+  "packageManager": "pnpm@9.15.3+sha512.1f79bc245a66eb0b07c5d4d83131240774642caaa86ef7d0434ab47c0d16f66b04e21e0c086eb61e62c77efc4d7f7ec071afad3796af64892fae66509173893a"
 }

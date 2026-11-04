@@ -8,8 +8,8 @@ tx hash in `decisions.md`). Where something is an estimate, it says so.
 > **One-line framing:** optimistic aggregation is **live on Monad testnet today**, and the hash-based-STARK
 > validity proof **now runs end to end on our own signatures**: leanXMSS batches → leanVM → Keccak
 > terminal proof → **verified on Monad in one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). Trustless
-> binding and per-signer messages now work on Monad too; remaining is scale (binding-hash cost) and
-> production-key convergence. See §3 (efforts) and §4 (unknowns).
+> binding and per-signer messages now work on Monad at scale (binding v2: 2,048 signatures in one tx);
+> remaining is production-key convergence and proving speed. See §3 (efforts) and §4 (unknowns).
 
 ---
 
@@ -107,7 +107,10 @@ Three reasons, each now backed by a measurement, not a claim:
    deploys under Monad's **128 KB** contract limit ([MIP-2](https://mips.monad.xyz/MIPs/MIP-2)) but
    **would not deploy on Ethereum** (24 KB). Verifying a proof cost **~12.84M gas** in one transaction on
    Monad testnet — Monad gives **30M gas per transaction** (Ethereum: 30M per *block*), so it's cents
-   here and tens of dollars, if it fit at all, on Ethereum mainnet.
+   here and tens of dollars, if it fit at all, on Ethereum mainnet. The deployed verifier is
+   `0x4fa20bd740deb7969416749dbedb5d8e5b65c4be` (verify tx
+   `0x3ab6054a444f6f52bc4054ccbfc2b621dfc91564ba324de62c4ab9cc8fec968c`); it is generated
+   `sol-spartan-whir` code, unverified on the explorer.
 3. **The rails and the gap are already on Monad.** ERC-4337 EntryPoints (v0.6–v0.8), EIP-7702 and a P-256
    precompile are deployed, so the aggregator plugs in with no fork. Monad has publicly committed to a PQ
    roadmap that leaves the size question open. The design we implement,
@@ -156,9 +159,9 @@ STARK prove many PQ signatures and be checked on Monad in budget?" — is answer
   registrar**. Swapped roots, changed messages or changed pubkeys revert (`RootMismatch`), tampered
   proofs revert (`MERKLE_ROOT`), and replays are rejected (`AlreadyAccepted`). Verified on Monad at small
   N (2×4 signatures, 8 distinct messages).
-- **Binding cost is the new bottleneck.** The on-chain hash that does the binding (Poseidon in Solidity)
-  costs ~160k gas per signer, so a bound batch fits ~105 signers per tx under the 30M cap today — fine
-  for the demo, not yet for scale; a cheaper on-chain hash is the next step.
+- **Binding now scales (binding v2).** A keccak-challenge polynomial binding cut the cost from ~160k to
+  **~3.2k gas per signer**, so **2,048 signatures with distinct messages verify on Monad in one tx
+  (~23.2M gas)** — not ~105. (Soundness is a Schwartz–Zippel argument over F_p^5, not externally reviewed.)
 - **Account ↔ key binding and scheme convergence.** The proof binds to signer public keys, and the
   validity lane now proves **SDK-signed** leanXMSS batches (K11), not deterministic test keys. Still
   open: tying a key to a specific account (a registry or ERC-4337 account check) and converging on our

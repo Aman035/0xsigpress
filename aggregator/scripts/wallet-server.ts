@@ -19,7 +19,7 @@ import { readJson, writeJsonAtomic } from "../src/service/store.ts";
 const SERVICE = (process.env.SERVICE_URL ?? "http://127.0.0.1:8547").replace(/\/$/, "");
 const PORT = Number(process.env.PORT ?? 8550);
 const HOST = process.env.HOST ?? "127.0.0.1";
-const N = Number(process.env.ACCOUNTS ?? 3);
+const N = Number(process.env.ACCOUNTS ?? 1);
 const TAG = process.env.ACCOUNT_SEED ?? "sigpress-wallet";
 const FUND = parseEther(process.env.FUND ?? "0.002");
 const RECIPIENT: Address = getAddress(process.env.RECIPIENT ?? slice(keccak256(toBytes("sigpress-wallet-recipient")), 12));
