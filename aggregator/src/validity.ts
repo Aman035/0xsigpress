@@ -424,10 +424,22 @@ export async function send(c: Clients, to: Address | undefined, data: Hex, value
     }
   }
   const gas = (est * 105n) / 100n;
-  const hash = await c.walletClient.sendTransaction({ account: c.account, chain: c.chain, to, data, gas, value });
-  const receipt = await c.publicClient.waitForTransactionReceipt({ hash, timeout: 180_000 });
-  if (receipt.status !== "success") throw new Error(`tx ${hash} reverted`);
-  return { hash, est, gas, receipt };
+  // A big tx can sit unmined in one RPC node's pool (seen on Monad testnet with a 140 KB submit: receipt never came,
+  // re-sending the same raw tx was refused). On a receipt timeout, replace it: same nonce, higher fees.
+  const nonce = await c.publicClient.getTransactionCount({ address: c.account.address, blockTag: "pending" });
+  const fees = await c.publicClient.estimateFeesPerGas();
+  for (let attempt = 0; ; attempt++) {
+    const bump = BigInt(attempt) * 5_000_000_000n;
+    const hash = await c.walletClient.sendTransaction({ account: c.account, chain: c.chain, to, data, gas, value, nonce, maxPriorityFeePerGas: fees.maxPriorityFeePerGas + bump, maxFeePerGas: fees.maxFeePerGas + 2n * bump });
+    try {
+      const receipt = await c.publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
+      if (receipt.status !== "success") throw new Error(`tx ${hash} reverted`);
+      return { hash, est, gas, receipt };
+    } catch (e) {
+      if (attempt >= 2 || !/Timed out/i.test(String((e as Error).message))) throw e;
+      if ((await c.publicClient.getTransactionCount({ address: c.account.address })) > nonce) throw new Error(`nonce ${nonce} used by another tx while ${hash} was pending; check the chain`);
+    }
+  }
 }
 
 const ERROR_ABIS = [...gateV2Abi, ...validityEntryAbi].filter((x) => x.type === "error");
