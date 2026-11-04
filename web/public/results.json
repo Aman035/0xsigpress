@@ -1,19 +1,19 @@
 {
   "naive": {
-    "txHash": "0x26f4bcbf31d0b508bc97d169b4951972d3246e8605c97da177133875180604b0",
-    "gasUsed": 118606,
+    "txHash": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
+    "gasUsed": 143278,
     "calldataBytes": 2276
   },
   "batch": {
-    "txHash": "0x724ec6e8b54d4a8ec255276173d2b2daaf278b43d09303fee215ea663715c3ea",
-    "gasUsed": 102063,
+    "txHash": "0x8ea9ebd4eb2f0cd8e7bee8f7619787523e1a9281b222fc2a74c98381058ccdb2",
+    "gasUsed": 110494,
     "count": 256,
-    "root": "0x40b4e4729e176f4a538b29707f8cb66e6e1835650d24776068457eac16e9d218",
+    "root": "0xc8765a9c241af1ab085e2b3fd691247f03ffa23ee592327275c07066897c2a6c",
     "bytesPerOp": 0.890625
   },
   "tamper": {
-    "submitTx": "0x1761b395b10477de521f0c936dd9878f92227ca126612e6dd352385e14fe27e2",
-    "challengeTx": "0xfafe5108cb194d701f439fccac90bb5b0758e2727c7e5187401fc576f7f90399",
+    "submitTx": "0xbf0eadaff66e9808751c18c08d0a03ad8a508ba12ce1b0f1a62dfb6e498ba493",
+    "challengeTx": "0x82319bcce81aaaf4b93bf8cbede4523737f5cf4c4a09b4127aa7d5527231e975",
     "slashed": true
   },
   "execute": {
@@ -47,5 +47,41 @@
     "amountEach": "0.0001",
     "directTx": "0x9b690e18962beaa97859fae38a063b8f17aa68d718844ef6d4b1eee3159ae2c6",
     "directGas": 186088
+  },
+  "stage": {
+    "startedAt": "2026-11-04T08:42:25.147Z",
+    "n": 256,
+    "chainId": 10143,
+    "account": "0x445a0c4780a8107158df60B18Ee5372497dc1D12",
+    "batch": {
+      "txHash": "0x8ea9ebd4eb2f0cd8e7bee8f7619787523e1a9281b222fc2a74c98381058ccdb2",
+      "batchId": 5,
+      "gasUsed": 110494,
+      "inputBytes": 228,
+      "bytesPerOp": 0.890625,
+      "signMs": 4390,
+      "confirmMs": 1204,
+      "at": "2026-11-04T08:42:31.109Z"
+    },
+    "comparison": {
+      "naiveTx": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
+      "naiveFresh": true,
+      "naiveBytesPerOp": 2276,
+      "naiveGasPerOp": 143278,
+      "batchBytesPerOp": 0.890625,
+      "batchGasPerOp": 431.6171875,
+      "at": "2026-11-04T08:42:32.422Z"
+    },
+    "tamper": {
+      "submitTx": "0xbf0eadaff66e9808751c18c08d0a03ad8a508ba12ce1b0f1a62dfb6e498ba493",
+      "challengeTx": "0x82319bcce81aaaf4b93bf8cbede4523737f5cf4c4a09b4127aa7d5527231e975",
+      "batchId": 6,
+      "badIndex": 7,
+      "slashed": true,
+      "challengeGas": 216395,
+      "checkMs": 45,
+      "at": "2026-11-04T08:42:39.968Z"
+    },
+    "finishedAt": "2026-11-04T08:42:39.968Z"
   }
 }
