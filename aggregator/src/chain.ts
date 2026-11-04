@@ -29,8 +29,10 @@ export function loadDeployments(): Deployments {
 
 export async function getClients() {
   const rpc = process.env.RPC_URL ?? MONAD_TESTNET_RPC;
-  const pk = process.env.PRIVATE_KEY;
-  if (!pk) throw new Error("PRIVATE_KEY not set (root .env)");
+  // KEY_VAR names the env var holding the key (default PRIVATE_KEY), so parallel runs can use separate keys.
+  const keyVar = process.env.KEY_VAR ?? "PRIVATE_KEY";
+  const pk = process.env[keyVar];
+  if (!pk) throw new Error(`${keyVar} not set (root .env)`);
   const account = privateKeyToAccount((pk.startsWith("0x") ? pk : `0x${pk}`) as Hex);
 
   let chainId = 10143;
