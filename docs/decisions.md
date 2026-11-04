@@ -463,3 +463,37 @@ Comparisons:
   line, and the result holds at every N measured. Keep ERC-4337 only as a compatibility lane (K8). The main
   bytes-per-op claim in the pitch should use the compact entry: ~98 B/op on chain at N = 128, measured. The
   remaining 97 B/op is mostly `nextPkHash` + `sigHash` (64 B).
+
+## K10-terminal — our leanXMSS batches through the Keccak terminal, verified on Monad (4 Nov 2026)
+
+- **Test:** prove two of our own leanXMSS batches through leanVM -> lift -> Keccak240 terminal root,
+  generate a Solidity verifier for that chain, verify on anvil and Monad testnet. Base:
+  `Client-Side-Proving/leanVM@fb0909d` (Apache-2.0) + our patch; verifier generator from
+  `ethereum/sol-whir-p3@b82359e` (no LICENSE file; research use relying on its `SPDX: MIT` headers) +
+  our patch. Details, commands, tx list: `experiments/k10-terminal/README.md`.
+- **Built:** `prepare_raw_single_message_execution` (aggregation witness without the proof, so the
+  same bytecode is proved under the lift's explicit profile); `sigpress-xmss-terminal` (authors'
+  recursion runner with the Spartan fixtures replaced by two in-process leanXMSS batches, each
+  signing its own 32-byte batch root); our own `terminal_hashes.py` (the generator imports an
+  unpublished module); a provenance-skip flag in the generator; `SigpressTerminalGate.sol` (checks the
+  proof's application root against a registered value for the (left, right) batch-root pair).
+- **Measured (Monad testnet, 2 x 4 sigs):** verifier `0x92a964b177f2d6726121829df3218b9e667f4e9b`
+  (deploy est. 13,572,655, charged 14,251,287); `submit` = verify + root check in **one tx, est.
+  12,188,298, charged 12,797,712**, calldata 106,404 B, tx `0x55212a00…4f92`; `accepted` = true;
+  tampered proof reverts `MERKLE_ROOT`; swapped batch roots revert `ROOT_MISMATCH`.
+- **Measured (prover, M4 16 GB, single runs):** 2 x 4 / 2 x 64 / 2 x 256 sigs: terminal proof
+  110,531 / 110,984 / 110,952 B; all proving 40.9 / 51.6 / 57.7 s (lift + root dominate, ~fixed);
+  max RSS 5.87 / 5.39 / 5.99 GB. Anvil verify gas 12,093,782 / 12,105,473 / 12,100,827; calldata
+  106,340 / 106,692 / 106,628 B. At 512 sigs: ~23.6k gas/sig, ~208 B/sig.
+- **Measured (one verifier, many N):** a 2 x 4 proof padded to the 2 x 256 table shape
+  (`SIGPRESS_MIN_LOG_ROWS=18,13,16`) has the same fixed programs and is accepted by the deployed
+  2 x 256 verifier (anvil). Unpadded, verifiers are per child shape (2 x 64 proof on the 2 x 4 verifier:
+  `FIXED_PROGRAM_ROOT`).
+- **Not bound yet:** batch root -> application root is registered off chain (recomputed by
+  `tools/app_root.py`, matches the proof); the signer set is inside the digest; one shared message
+  per batch (not per-user userOps); KoalaBear/Poseidon leanXMSS, not K5's Keccak leanXMSS or our
+  `WOTS.sol`; chain security = the authors' 100-bit component targets, composition not analysed.
+- **Decision:** the validity-proof path now runs end to end on Monad with our own signatures:
+  **K4/K6 critical path cleared** at small N. Larger-N verifiers verified on anvil only (wallet has
+  0.154 MON left after 3 faucet calls; ~2.8 MON needed per extra verifier + submit). Next: fund and
+  deploy one fixed-shape verifier, bind the root on chain, move to per-user messages.
