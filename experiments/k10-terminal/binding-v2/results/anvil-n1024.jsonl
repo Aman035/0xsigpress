@@ -1,0 +1,12 @@
+{"step":"deploy_verifier","r":{"contractAddress":"0xa513e6e4b8f2a923d98304ec87f64353c4d5c853","status":"0x1","gasUsed":"0xcda43f","transactionHash":"0x281e558d1829ab8cd0883a5cc7d295b20bcdaa758ddf937467d4a322abd0e358","estimate":"13476927"}}
+{"step":"deploy_gate","r":{"contractAddress":"0x2279b7a0a67db372996a5fab50d91eaa73d2ebe6","status":"0x1","gasUsed":"0x215669","transactionHash":"0x4687329329c9b8daf737a9765bbabd7bc5778df2ec90dfa961c3c6c59b93af18","estimate":"2184809"}}
+{"step":"eth_call_swap-batches","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-message","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-signer","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-slot","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-commitment","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_tampered_proof","result":"Error: server returned an error response: error code 3: execution reverted: MERKLE_ROOT"}
+{"step":"submit_calldata_bytes","result":237956}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0x152f409","transactionHash":"0x45ffdaff76b35a883ef4ffd677fd7700b7e021e2e3f0bd24ea9b40b3df88dd84","estimate":"22356627"}}
+{"step":"eth_call_replay","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x1aa8064c"}
+{"step":"accepted","result":"true","commitment":"0x9dc40202ccf012f1907564a7988affe31a1b2955ed855991ea912d49ea594978","verifier":"0xa513e6e4b8f2a923d98304ec87f64353c4d5c853","hasher":"0x5fbdb2315678afecb367f032d93f642f64180aa3","gate":"0x2279b7a0a67db372996a5fab50d91eaa73d2ebe6"}

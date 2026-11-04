@@ -1,0 +1,19 @@
+{"step":"deploy_verifier","r":{"contractAddress":"0xa43f61c3936dc4d22b471594f99a33eadc7c4abb","status":"0x1","gasUsed":"0xd97517","transactionHash":"0x87cfb2cad7c54c1ecf3209083d29bfff7e48234a4e54e2fe6b4b957929bc4bf1","estimate":"13572655"}}
+Error: Max retries exceeded HTTP error 429 with body: Rate limit exceeded
+{"step":"deploy_gate","r":{"contractAddress":"0x38eeb174d437c038dd16ca91e682f24cdc71c697","status":"0x1","gasUsed":"0x22df3f","transactionHash":"0x9a682e1182a9f55d7f955126a7a6d6a074e8c258bc881a47ac101a2b183065de","estimate":"2176548"}}
+{"step":"eth_call_swap-batches","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-message","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-signer","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-slot","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-commitment","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_tampered_proof","result":"Error: server returned an error response: error code 3: execution reverted: MERKLE_ROOT"}
+{"step":"submit_calldata_bytes","result":140036}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0xff09d7","transactionHash":"0xb585a8981311a12ce107858cdddda19c441a6161037ecdaf50fa558773e97628","estimate":"15918285"}}
+{"step":"eth_call_replay","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"accepted","result":"true","commitment":"0x956440c070834eb235bf934b863fc1dc61259622625a3c08e8f293fadb73f4dd","verifier":"0xa43f61c3936dc4d22b471594f99a33eadc7c4abb","hasher":"0xb42CFc7fC5cdA85242dd3423F55DEc8b25Ce8dB2","gate":"0x38eeb174d437c038dd16ca91e682f24cdc71c697"}
+{"step":"eth_call_raw_swap-batches","response":{"code":3,"message":"execution reverted","data":"0x5ade0455"}}
+{"step":"eth_call_raw_wrong-message","response":{"code":3,"message":"execution reverted","data":"0x5ade0455"}}
+{"step":"eth_call_raw_wrong-signer","response":{"code":3,"message":"execution reverted","data":"0x5ade0455"}}
+{"step":"eth_call_raw_wrong-slot","response":{"code":3,"message":"execution reverted","data":"0x5ade0455"}}
+{"step":"eth_call_raw_wrong-commitment","response":{"code":3,"message":"execution reverted","data":"0x1aa8064c"}}
+{"step":"eth_call_raw_replay","response":{"code":3,"message":"execution reverted","data":"0x1aa8064c"}}

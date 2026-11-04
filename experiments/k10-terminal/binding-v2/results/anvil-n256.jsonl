@@ -1,0 +1,13 @@
+{"step":"deploy_hasher","r":{"contractAddress":"0x5fbdb2315678afecb367f032d93f642f64180aa3","status":"0x1","gasUsed":"0x5eec4a","transactionHash":"0x11a0ae90d7882a6f3fb3335bb3a7d33b2994948d3c04f86291c4341a8b1163ad","estimate":"6220874"}}
+{"step":"deploy_verifier","r":{"contractAddress":"0xe7f1725e7734ce288f8367e1bb143e90bb3f0512","status":"0x1","gasUsed":"0xcda43f","transactionHash":"0x6531d9a2865e7792a5fc5f6a643d82149629dda49e1365050899c5a47ca0d20e","estimate":"13476927"}}
+{"step":"deploy_gate","r":{"contractAddress":"0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0","status":"0x1","gasUsed":"0x215669","transactionHash":"0x77bad413a5196d8160457b10b0c1372b115eebebf7646ba31c212121edff911c","estimate":"2184809"}}
+{"step":"eth_call_swap-batches","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-message","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-signer","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-slot","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_wrong-commitment","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x5ade0455"}
+{"step":"eth_call_tampered_proof","result":"Error: server returned an error response: error code 3: execution reverted: MERKLE_ROOT"}
+{"step":"submit_calldata_bytes","result":140036}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0xf27887","transactionHash":"0xb425771c686afdaa93ac1d29a30f827ea2471bc98b6c062bb35dfe5fec9034c2","estimate":"16033616"}}
+{"step":"eth_call_replay","result":"Error: server returned an error response: error code 3: execution reverted: custom error 0x1aa8064c"}
+{"step":"accepted","result":"true","commitment":"0x956440c070834eb235bf934b863fc1dc61259622625a3c08e8f293fadb73f4dd","verifier":"0xe7f1725e7734ce288f8367e1bb143e90bb3f0512","hasher":"0x5fbdb2315678afecb367f032d93f642f64180aa3","gate":"0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0"}
