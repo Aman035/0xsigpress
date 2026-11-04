@@ -601,3 +601,45 @@ Comparisons:
   fine for a Blitz demo (2 x 4 to ~2 x 50), not for scale. Next for scale: a Keccak (or cheaper on-chain)
   statement digest from the guest, or binding via an on-chain signer registry so per-tx calldata shrinks to
   indices + messages; then account binding.
+
+## K10 binding v2 — binding cost cut from ~160k to ~3-4k gas per signer; 2 x 256 and 2 x 1024 in one Monad tx (4 Nov 2026)
+
+- **Test:** make the trustless proof <-> (slot, pubkeys, per-signer messages) binding cheap enough that 2 x 256
+  signers fit one Monad tx at <= ~25M gas (binding <~25k/signer). Details, tx list, commands:
+  `experiments/k10-terminal/binding-v2/README.md`.
+- **Candidates measured first:** (a) Keccak in the leanVM guest: one Keccak-f[1600] (bit per field element)
+  executes in **664,235 cycles** (measured, execution only) = ~312k cycles per signer vs ~730 today; not built
+  (estimate: a 2 x 256 child would need ~2^26 rows, beyond 16 GB). (b) Poseidon-only max-rate sponge over raw
+  data: **~121k gas/signer** (forge, 2 x 256). (c) on-chain signer registry (messages still Poseidon-hashed):
+  **~70k gas/signer** (forge). Both miss the goal because one permutation costs 50,517 gas and fresh 32-byte
+  messages need >= 1.1 permutations each.
+- **Choice (d):** keccak challenge + polynomial identity. The prover commits D = Poseidon(signer data) (in
+  calldata); the gate derives r in F_p^5 from keccak(slot, n, D, pubkeys, messages) and evaluates a degree < 17n
+  polynomial of the calldata data at r; the guest evaluates the same polynomial on the data it verified
+  (extension-field precompiles) and exposes D, r, v in its public input. 11 Poseidon permutations per tx in
+  total. Soundness: Schwartz-Zippel over F_p^5 with D fixed before r (~2^-141 per try at n = 2^14); our
+  argument, not externally reviewed.
+- **Built:** leanVM patch on top of the v1 binding patch (in-guest `hash_message` from hinted limbs, D, Horner
+  over F_p^5; same public-input size), Rust witness/challenge code, `SigpressBindV2Gate.sol` (Yul Horner,
+  packed power table), Python mirror (matched prover D/r/v/preimage/root on all runs), 18 real-proof gate tests
+  per shape (accept, replay, tampered proof/openings/root, wrong/dropped/swapped signer, wrong/swapped message,
+  swapped batches, wrong slot, wrong commitment, non-canonical inputs).
+- **Measured (forge, binding only, warm):** 2 x 1 / 4 / 64 / 256 / 1024: 0.64M / 0.66M / 1.02M / 2.25M / 7.88M
+  -> **~3.2k gas per signer** + ~0.64M fixed (+0.94M once per batch size). v1: ~160k per signer.
+- **Measured (prover, single runs):** all proving 51.0 / 41.7 / 53.9 / 71.6 s for 2 x 4 / 64 / 256 / 1024; max RSS
+  5.5-7.5 GB; terminal proof ~111 KB. Child rows +14% vs K10 single-message at 2 x 256; lift/root unchanged.
+- **Measured (Monad testnet):** 2 x 256 verifier `0xa43f61c3…4abb`, gate `0x38eeb174…c697`; **`submit` 512
+  signers, 512 distinct messages: status 1, est. 15,918,285, charged 16,714,199, calldata 140,036 B, tx
+  `0xb585a898…7628`**. 2 x 1024 verifier `0xc6304db4…794f`, gate `0x5648caea…a661`; `submit` est. 22,084,417,
+  calldata 237,956 B: **status 1, 2,048 signers, charged 23,188,637, tx `0x97e2a519…2ec1`**. eth_call negatives: swapped batches / changed message / changed
+  pubkey / wrong slot / changed D -> `RootMismatch`; tampered proof -> `MERKLE_ROOT`; replay -> `AlreadyAccepted`.
+  Hasher reused from v1 (`0xb42C…8dB2`, runtime code checked equal).
+- **Max signers per 30M tx:** ~3,600-3,900 by gas (arithmetic from the two Monad estimates, ~4.0k marginal gas
+  per signer incl. calldata; not a measured tx); calldata size (64 B/signer + 107 KB) may cap first against
+  Monad's still-unverified ~384 KiB tx limit (~4,400 signers).
+- **Not bound / limits:** account <-> pubkey (unchanged); one verifier per batch shape (padding to a fixed shape
+  not re-done for v2); the polynomial-binding argument and the guest's Horner are tested by honest runs and
+  contract negatives only; one slot, raw signatures, two batches per terminal.
+- **Decision:** binding is no longer the bottleneck: at 512 signers the tx is ~31k gas per signer charged,
+  dominated by the flat ~12.1M verifier. Use v2 as the binding design. Next: account binding (registry or 4337
+  account check), one fixed-shape verifier with padding, and an independent review of the soundness argument.
