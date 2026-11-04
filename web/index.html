@@ -282,8 +282,8 @@ function proof(ex,hash){
   document.getElementById("exFin").innerHTML = res.execute?.finalizeTx?proof(ex,res.execute.finalizeTx):"—";
 
   const limits = [
-    "The link from a batch to its proof is set by a trusted helper today, not yet trustlessly on chain.",
-    "Every signer in a batch signs one shared message; real apps need a message per operation.",
+    "Binding is now trustless: the contract recomputes the batch from the signers and their per-operation messages on chain, no trusted helper.",
+    "The on-chain binding hash is still expensive, so about 105 signers fit in one transaction today.",
     "The prototype uses a research key format, not our production post-quantum accounts yet.",
     "Proving a batch takes about a minute, so the live product path stays the optimistic one for now."
   ];

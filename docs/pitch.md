@@ -7,8 +7,9 @@ tx hash in `decisions.md`). Where something is an estimate, it says so.
 
 > **One-line framing:** optimistic aggregation is **live on Monad testnet today**, and the hash-based-STARK
 > validity proof **now runs end to end on our own signatures**: leanXMSS batches → leanVM → Keccak
-> terminal proof → **verified on Monad in one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). Remaining: trustless
-> batch binding and per-op messages. See §3 (efforts) and §4 (unknowns).
+> terminal proof → **verified on Monad in one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). Trustless
+> binding and per-signer messages now work on Monad too; remaining is scale (binding-hash cost) and
+> production-key convergence. See §3 (efforts) and §4 (unknowns).
 
 ---
 
@@ -149,13 +150,19 @@ and cost is **flat in N (~208 B, ~24k gas per signature)**. The feasibility ques
 STARK prove many PQ signatures and be checked on Monad in budget?" — is answered *yes*. What remains is
 **hardening, not feasibility**:
 
-- **Trustless batch binding.** Today the batch-root ↔ proof link is posted by one trusted address; it
-  needs a trustless on-chain link between the proof's public input and the batch.
-- **Per-op messages.** All signers in a batch currently sign one shared message; real operations need a
-  distinct per-op message bound into the proof.
-- **Scheme alignment.** The validity lane now proves **SDK-signed** leanXMSS batches (verified on Monad,
-  K11) rather than deterministic test keys — a step toward production keys. Full convergence with our
-  on-chain Keccak WOTS accounts is still open.
+- **Trustless binding and per-op messages now work end to end on Monad (K10 binding).**
+  `SigpressValidityGate` recomputes the batch's application root on-chain from the signers and their
+  **per-signer messages** and requires it to equal the proof's public input, with **no trusted
+  registrar**. Swapped roots, changed messages or changed pubkeys revert (`RootMismatch`), tampered
+  proofs revert (`MERKLE_ROOT`), and replays are rejected (`AlreadyAccepted`). Verified on Monad at small
+  N (2×4 signatures, 8 distinct messages).
+- **Binding cost is the new bottleneck.** The on-chain hash that does the binding (Poseidon in Solidity)
+  costs ~160k gas per signer, so a bound batch fits ~105 signers per tx under the 30M cap today — fine
+  for the demo, not yet for scale; a cheaper on-chain hash is the next step.
+- **Account ↔ key binding and scheme convergence.** The proof binds to signer public keys, and the
+  validity lane now proves **SDK-signed** leanXMSS batches (K11), not deterministic test keys. Still
+  open: tying a key to a specific account (a registry or ERC-4337 account check) and converging on our
+  production Keccak WOTS accounts.
 - **Proving speed.** The terminal proof takes ~40–58 s on a 16 GB laptop (~6 GB RSS) — longer than a
   block, so batches span blocks or need better hardware.
 - **K9 (bytes/op): the generic 4337 path missed the 1.5× target (990 B/op) — now fixed.** The compact

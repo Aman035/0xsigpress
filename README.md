@@ -150,11 +150,12 @@ flowchart LR
 ## Honest limits
 
 - **The validity proof is a working prototype, not the shipped path yet.** It already verifies real
-  signature batches on Monad, and a few things still need hardening: the link from a batch to its proof
-  is set by a trusted helper today rather than trustlessly on chain, every signer in a batch signs the
-  same message (real apps need one message per operation), the prototype uses a research key format
-  instead of our production keys, and proving a batch takes about a minute. Until those close, the live
-  product path stays the simpler optimistic one.
+  signature batches on Monad, and it now binds trustlessly: the contract recomputes the batch from the
+  signers and their per-operation messages on chain (no trusted helper), and swapped batches, changed
+  messages or tampered proofs revert. What still needs hardening is scale and production fit: the on-chain
+  binding hash is expensive (about 105 signers per transaction today), the prototype still uses a research
+  key format rather than our production accounts, and proving a batch takes about a minute. Until those
+  close, the live product path stays the simpler optimistic one.
 - **Keys are single-use.** Hash-based signatures use one-time keys, so the wallet rotates to a fresh key
   on every operation and never reuses one.
 - **Every figure is real.** Each number is measured on Monad testnet with a transaction you can open, or
