@@ -74,9 +74,37 @@ What this shows:
   So a product deploys one verifier for a maximum shape and pads smaller batches.
 - **16 GB was enough** for all runs (max RSS ≤ 6.2 GB, though macOS reported ~14-15 GB peak footprint).
 
-**Not done on Monad:** the 2 x 64 / 2 x 256 verifiers. The 2 x 4 run used 2.85 MON (deploy 14.25M gas
-+ submit 12.8M gas charged, at 102 gwei); 0.154 MON is left and the three faucet calls are spent. A
-2 x 256 verifier deploy plus one submit needs about 2.8 MON (estimate from the anvil gas x 1.05 x 102 gwei).
+## One fixed-shape (2 x 256) verifier on Monad testnet
+
+Addresses, ABIs and calldata formats for integration: `deployed-2x256.json`. Log:
+`results/monad-2x256.jsonl` (some `full_2x256` read-only lines appear twice: the check script was run
+once without and once with the submit tx). Gas price 102 gwei; gas limit = estimate + 5% (Monad charges
+the limit).
+
+| Step | Estimate | Charged | Calldata | Tx / result |
+|---|---|---|---|---|
+| Deploy verifier `LeanVmTwoCommitmentTerminal_SigpressXmssC1N256` -> `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` | 13,572,474 | 14,251,097 | — | `0x294ec3d37e775926ada1d2d403e60c16950e128e0084e6064da8adacc566cca1` |
+| Deploy gate -> `0xdf9bfc6a96fb36cef902eb9e95a65da4b5a94c8e` | 494,804 | 519,544 | — | `0x337cfa307344125125117cfb0508ceda370c0b2c6035eabb83b8f5e7020c333f` |
+| (a) full 2 x 256: `verifyC1V1` `eth_call` | 12,034,849 | — | 106,628 B | `true` |
+| (a) register pair | 56,938 | 59,784 | — | `0xea05ec5d6086d004ee956a15e22e85940e65610e5264d8d924db4a09f7b866a2` |
+| **(a) full 2 x 256: `submit` tx (verify + root check)** | **12,195,486** | **12,805,260** | **106,692 B** | **`0x02d582dede07fd5646f64fbba959678401d792d7422dc38ba79cde5219189021`, status 1, `accepted` = true** |
+| (b) padded 2 x 4 (to the 2 x 256 shape), new batch roots: `verifyC1V1` `eth_call` | 12,018,281 | — | 106,276 B | `true` |
+| (b) register pair | 56,938 | 59,784 | — | `0x34baf6c8178525535cf14d99d55c1f05602587c67b6db5cae1729e68041ae15c` |
+| (b) `submit` `eth_call` | 12,178,749 | — (not sent) | 106,340 B | succeeds (no revert) |
+| (c) tampered 2 x 256 proof (bit flip at byte 60,000), `eth_call` | — | — | 106,628 B | reverts `MERKLE_ROOT` |
+
+**At 512 signatures (full batch):** 12,805,260 gas charged / 512 = **~25.0k gas per signature**
+(23.8k on the estimate), and 106,692 B / 512 = **~208 B of calldata per signature**, in one Monad
+transaction that both verifies the terminal proof and checks the batch-root pair.
+
+**Not done:** the padded batch's `submit` as a real tx. The wallet started at 3.354 MON and has 0.290 left;
+one more submit costs ~1.31 MON. The same proof and calldata pass `eth_call` on the deployed contracts,
+and the padded batch's pair is registered on chain.
+
+The padded batch was re-proved with distinct batch roots (sha256 of `sigpress-left-batch-small` /
+`sigpress-right-batch-small`), so the gate can hold both pairs: `runs/n4pad256b` (46.3 s wall, 5.53 GB
+max RSS, run under the shared prover lock). Its generated verifier config is identical to the 2 x 256 one.
+Earlier per-N verifiers on Monad: the 2 x 4 verifier `0x92a9…4e9b` (section "Result").
 
 ## What we built (and why)
 
@@ -166,8 +194,8 @@ RPC=https://testnet-rpc.monad.xyz PK=$PRIVATE_KEY_K4 SKIP_VERIFY_TX=1 tools/gate
 
 ## Next steps
 
-1. Fund the wallet (~2.8 MON) and deploy the 2 x 256 (or a larger fixed-shape) verifier on Monad;
-   submit a padded small batch and a full batch to the same contract.
+1. Done: one 2 x 256 verifier on Monad, a full batch submitted, a padded batch checked by `eth_call`
+   (above). Binding work (items 2-3) moved to `binding/`, owned separately.
 2. Bind batch root -> applicationRoot on chain (Poseidon1 in Solidity, or a Keccak digest exposed by the
    root program), then drop the registrar.
 3. Per-user messages: multi-message aggregation as the child, or a guest that verifies (pubkey, userOpHash)
