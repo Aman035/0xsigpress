@@ -105,3 +105,10 @@ live-mainnet block sampling noted under K1.
   Draft Ethereum *protocol* design (no working implementation); leanMultisig's verifier is a research
   prototype with no EVM verifier. Monad's own consensus paper (Quantum Cadence) explicitly has no PQ
   aggregation answer. **This would be the first working app-layer PQ aggregator with an on-chain verifier.**
+
+## Blitz-day scope decision (4 Nov 2026)
+
+- **Situation:** K3-K6 (STARK verifier on Monad) not measured; build window is 1.5 h.
+- **Decision:** ship the `demo.md` fallback — on-chain WOTS (Keccak, hash-based) verification plus
+  optimistic aggregation (Merkle root + bond on chain, single-signature fraud proof slashes the bond).
+  Pitch says "optimistic today, validity proof (STARK) next". See `docs/hackathon-plan.md`.
