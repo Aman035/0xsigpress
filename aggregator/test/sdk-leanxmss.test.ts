@@ -12,10 +12,12 @@ import {
   LEANXMSS_SIG_BYTES,
   leanxmssBin,
   leanxmssExportBatch,
+  leanxmssGatePubkey,
   leanxmssKeygen,
   leanxmssLoadKey,
   leanxmssProveBatch,
   leanxmssSign,
+  leanxmssSignAsync,
   leanxmssVerify,
   LeanXmssCliError,
 } from "../src/sdk/leanxmss.ts";
@@ -110,6 +112,44 @@ test("leanxmss: refuses slot reuse (TS and CLI), burns skipped slots, CLI --rese
   assert.equal(leanxmssSign(key, ks2, m).slot, 8);
   ks2.close();
   rmSync(dir, { recursive: true });
+});
+
+test("leanxmss: per-signer batch keeps each signer's own message; single-message provers refuse it", { skip }, async () => {
+  const dir = tmp();
+  const slot = 3;
+  const sigs = await Promise.all(
+    [0, 1, 2].map(async (k) => {
+      const key = leanxmssKeygen(seedOf(`lx-ps-${k}`), join(dir, `k${k}.json`), { logSlots: 4 });
+      const ks = createLeanXmssKeyStore(join(dir, `s${k}.json`), key, quiet);
+      const s = await leanxmssSignAsync(key, ks, seedOf(`op-${k}`), { slot });
+      ks.close();
+      assert.equal(onDisk(join(dir, `s${k}.json`)), slot + 1);
+      return s;
+    }),
+  );
+  const path = join(dir, "batch.json");
+  // Without perSigner, different messages are refused.
+  assert.throws(() => leanxmssExportBatch(sigs, path), /different \(message, slot\)/);
+  const info = leanxmssExportBatch(sigs, path, { perSigner: true });
+  assert.equal(info.signers, 3);
+  assert.equal(info.message, null);
+  const f = JSON.parse(readFileSync(path, "utf8")) as { message?: string; signers: { publicKey: Hex; message: Hex }[] };
+  assert.equal(f.message, undefined);
+  const byPk = new Map(sigs.map((s) => [s.publicKey.toLowerCase(), s.message.toLowerCase()]));
+  for (const s of f.signers) assert.equal(s.message.toLowerCase(), byPk.get(s.publicKey.toLowerCase()));
+  // Mixed slots are still refused.
+  assert.throws(() => leanxmssExportBatch([...sigs.slice(0, 2), { ...sigs[2]!, slot: 4 }], join(dir, "bad.json"), { perSigner: true }), /different \(message, slot\)/);
+  // The single-message prover path refuses a per-signer batch.
+  assert.throws(() => leanxmssProveBatch(path), /per-signer batch/);
+  rmSync(dir, { recursive: true });
+});
+
+test("leanxmss: gate pubkey encoding byte-swaps each 32-bit limb", () => {
+  assert.equal(
+    leanxmssGatePubkey("0x0100000002000000030000000400000005000000060000000700000008000000"),
+    "0x0000000100000002000000030000000400000005000000060000000700000008",
+  );
+  assert.throws(() => leanxmssGatePubkey("0x1234"));
 });
 
 test("leanxmss: exported batch is accepted by the vendored leanVM aggregation prover/verifier", { skip }, async () => {

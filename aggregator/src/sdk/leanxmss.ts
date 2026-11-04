@@ -16,7 +16,7 @@
 //
 // Binary: env SIGPRESS_LEANXMSS_BIN, default <repo>/experiments/k11-leanxmss/signer/target/release/sigpress-leanxmss
 // (build: cd experiments/k11-leanxmss/signer && cargo build --release -j 4; needs experiments/k10-terminal/vendor).
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -61,6 +61,24 @@ function cli<T>(args: string[], okStatuses: number[] = [0]): { status: number; o
   }
 }
 
+/** Async variant of cli() (child process; does not block the event loop). */
+function cliAsync<T>(args: string[]): Promise<T> {
+  return new Promise((res, rej) =>
+    execFile(leanxmssBin(), args, { encoding: "utf8", maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
+      if (err) {
+        if ((err as { code?: unknown }).code === "ENOENT") return rej(new LeanXmssCliError(`leanXMSS CLI not found at ${leanxmssBin()} (set SIGPRESS_LEANXMSS_BIN)`, null));
+        const code = (err as { code?: unknown }).code;
+        return rej(new LeanXmssCliError((stderr || String(err)).trim(), typeof code === "number" ? code : null));
+      }
+      try {
+        res(JSON.parse(stdout) as T);
+      } catch (e) {
+        rej(e);
+      }
+    }),
+  );
+}
+
 export interface LeanXmssKey {
   /** Path of the key file. It contains the secret seed (mode 0600). */
   keyPath: string;
@@ -97,6 +115,20 @@ export function leanxmssKeygen(
     String(logSlots),
     "--activation-slot",
     String(activationSlot),
+  ]);
+  return { keyPath, publicKey: out.publicKey, activationSlot, logSlots, keygenMs: out.keygenMs };
+}
+
+/** Async leanxmssKeygen (same CLI call in a child process). */
+export async function leanxmssKeygenAsync(
+  seed: Hex,
+  keyPath: string,
+  opts: { logSlots?: number; activationSlot?: number } = {},
+): Promise<LeanXmssKey & { keygenMs: number }> {
+  const logSlots = opts.logSlots ?? 10;
+  const activationSlot = opts.activationSlot ?? 0;
+  const out = await cliAsync<{ publicKey: Hex; keygenMs: number }>([
+    "keygen", "--seed", seed, "--out", keyPath, "--log-slots", String(logSlots), "--activation-slot", String(activationSlot),
   ]);
   return { keyPath, publicKey: out.publicKey, activationSlot, logSlots, keygenMs: out.keygenMs };
 }
@@ -157,24 +189,62 @@ export function leanxmssVerify(publicKey: Hex, slot: number, m: Hex, signature: 
 }
 
 /**
- * Write a batch file for the provers: every signature must be over the same (message, slot). The CLI verifies each
- * one, rejects duplicate signers and sorts by public key.
+ * Async stateful sign (same rules as leanxmssSign; the CLI runs in a child process so many signers can sign in
+ * parallel without blocking the event loop). The index is reserved and persisted synchronously before the CLI starts.
+ */
+export async function leanxmssSignAsync(key: LeanXmssKey, ks: KeyStore, m: Hex, opts: { slot?: number; final?: boolean } = {}): Promise<LeanXmssSignature> {
+  if (ks.root.toLowerCase() !== key.publicKey.toLowerCase() || ks.height !== key.logSlots) throw new Error("key does not match this key state (root/height)");
+  if (!/^0x[0-9a-fA-F]{64}$/.test(m)) throw new Error("message must be 32 bytes hex");
+  let target: number | undefined;
+  if (opts.slot !== undefined) {
+    target = opts.slot - key.activationSlot;
+    if (!Number.isInteger(target) || target < 0 || target >= ks.capacity) throw new Error(`slot ${opts.slot} outside this key's range`);
+    if (target < ks.nextIndex) throw new Error(`slot ${opts.slot} already used or skipped (next free slot ${key.activationSlot + ks.nextIndex})`);
+    while (ks.nextIndex < target) ks.reserveIndex({ final: opts.final });
+  }
+  const i = ks.reserveIndex({ final: opts.final });
+  if (target !== undefined && i !== target) throw new Error("internal: reserved index does not match the requested slot");
+  return cliAsync<LeanXmssSignature>(["sign", "--key", key.keyPath, "--state", ks.path, "--index", String(i), "--msg", m, "--reserved"]);
+}
+
+/**
+ * The gate's encoding of a leanXMSS public key: the same 8 KoalaBear limbs [merkle_root(4) | public_param(4)], but
+ * each as a big-endian uint32 (the SSZ public key stores them little-endian). This is what SigpressBindV2Gate
+ * takes in calldata and what ValidityEntry's registry stores.
+ */
+export function leanxmssGatePubkey(publicKey: Hex): Hex {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(publicKey)) throw new Error("leanXMSS public key must be 32 bytes hex");
+  const h = publicKey.slice(2).toLowerCase();
+  let out = "0x";
+  for (let w = 0; w < 8; w++) {
+    const le = h.slice(8 * w, 8 * w + 8);
+    out += le.slice(6, 8) + le.slice(4, 6) + le.slice(2, 4) + le.slice(0, 2);
+  }
+  return out as Hex;
+}
+
+/**
+ * Write a batch file for the provers. All signatures must be at one slot. Default: all over the same message (the
+ * single-message provers). `perSigner`: each signer keeps its own message (signers[i].message), the input the K10
+ * binding-v2 prover (sigpress-bindv2-terminal) reads. The CLI verifies each one, rejects duplicate signers and
+ * sorts by public key.
  */
 export function leanxmssExportBatch(
   sigs: LeanXmssSignature[],
   outPath: string,
-): { signers: number; message: Hex; slot: number; bytes: number } {
+  opts: { perSigner?: boolean } = {},
+): { signers: number; message: Hex | null; perSigner?: boolean; slot: number; bytes: number } {
   if (sigs.length === 0) throw new Error("empty batch");
   const { message, slot } = sigs[0]!;
   const dir = mkdtempSync(join(tmpdir(), "sigpress-lx-batch-"));
   try {
-    const args = ["export-batch", "--msg", message, "--slot", String(slot), "--out", outPath];
+    const args = ["export-batch", ...(opts.perSigner ? ["--per-signer"] : ["--msg", message]), "--slot", String(slot), "--out", outPath];
     sigs.forEach((s, k) => {
       const p = join(dir, `sig${k}.json`);
       writeFileSync(p, JSON.stringify(s));
       args.push("--sig", p);
     });
-    return cli<{ signers: number; message: Hex; slot: number; bytes: number }>(args).out;
+    return cli<{ signers: number; message: Hex | null; perSigner?: boolean; slot: number; bytes: number }>(args).out;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
