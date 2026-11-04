@@ -21,7 +21,7 @@ contract OptimisticAggregatorTest is Test {
     bytes32 root;
 
     function setUp() public {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, 0.001 ether, 60);
         vm.deal(aggregator, 1 ether);
         for (uint32 i = 0; i < 4; i++) {
             pks[i] = WOTSHelper.pkHash(seed, i);

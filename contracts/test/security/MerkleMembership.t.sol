@@ -18,7 +18,7 @@ contract MerkleMembershipTest is Test {
     }
 
     function setUp() public {
-        agg = new OptimisticAggregator(0.01 ether, 120);
+        agg = new OptimisticAggregator(0.01 ether, 120, 0.001 ether, 60);
         // 3 real leaves, padded with one zero leaf to 4
         leaves[0] = keccak256("leaf0");
         leaves[1] = keccak256("leaf1");

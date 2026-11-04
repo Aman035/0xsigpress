@@ -147,7 +147,7 @@ contract XMSSAccountTest is Test {
     uint256 constant WINDOW = 120;
 
     function setUp() public {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, 0.001 ether, 60);
         leaves = XMSSHelper.realLeaves(seed, H);
         acct = new XMSSAccount(agg, XMSSHelper.root(leaves), H);
         vm.deal(address(acct), 1 ether);
@@ -243,7 +243,7 @@ contract XMSSAccountTest is Test {
 /// Gas: executeDirect on XMSSAccount (h = 10) vs PQAccount (plain WOTS, rotating key).
 contract XMSSAccountGasTest is Test {
     function test_gas_executeDirect_h10_vs_PQAccount() public {
-        OptimisticAggregator agg = new OptimisticAggregator(0.01 ether, 120);
+        OptimisticAggregator agg = new OptimisticAggregator(0.01 ether, 120, 0.001 ether, 60);
         bytes32 seed = keccak256("gas");
         uint256 h = 10;
         address to = address(0xBEEF);

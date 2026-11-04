@@ -37,7 +37,7 @@ abstract contract EntryFixture is Test {
     uint256[] keyIndex;
 
     function _deploy() internal {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, 0.001 ether, 60);
         entry = new SigpressEntry(agg);
         vm.deal(aggregator, 100 ether);
         vm.deal(address(this), 100 ether);

@@ -198,7 +198,7 @@ contract SigpressEntryInvariantTest is Test {
     EntryHandler h;
 
     function setUp() public {
-        agg = new OptimisticAggregator(0.01 ether, 120);
+        agg = new OptimisticAggregator(0.01 ether, 120, 0.001 ether, 60);
         entry = new SigpressEntry(agg);
         h = new EntryHandler(agg, entry);
         bytes4[] memory sels = new bytes4[](4);

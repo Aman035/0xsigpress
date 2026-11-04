@@ -13,12 +13,12 @@ contract ParamsTest is Test {
     /// challenge window can be zero (finalize at once) while the contract reports a huge window.
     function test_hugeWindowRejected() public {
         vm.expectRevert(bytes4(keccak256("BadWindow()")));
-        new OptimisticAggregator(1, uint256(type(uint64).max) + 1);
+        new OptimisticAggregator(1, uint256(type(uint64).max) + 1, 0.001 ether, 60);
     }
 
     function test_hugeWindowWouldTruncate() public {
         uint256 w = uint256(type(uint64).max) + 1; // truncates to deadline = block.timestamp
-        try new OptimisticAggregator(1, w) returns (OptimisticAggregator agg) {
+        try new OptimisticAggregator(1, w, 0.001 ether, 60) returns (OptimisticAggregator agg) {
             uint256 id = agg.submitBatch{value: 1}(bytes32(uint256(1)), 1, "");
             vm.expectRevert(OptimisticAggregator.WindowOpen.selector);
             agg.finalize(id); // must still be inside the window
@@ -27,7 +27,7 @@ contract ParamsTest is Test {
 
     /// SR-06: createAccounts([]) with value keeps the ETH in SigpressEntry, which has no way to send it out.
     function test_createNoAccountsWithValueReverts() public {
-        SigpressEntry entry = new SigpressEntry(new OptimisticAggregator(1, 120));
+        SigpressEntry entry = new SigpressEntry(new OptimisticAggregator(1, 120, 0.001 ether, 60));
         vm.deal(address(this), 1 ether);
         vm.expectRevert(bytes4(keccak256("NoAccounts()")));
         entry.createAccounts{value: 1 ether}(new bytes32[](0));
@@ -35,7 +35,7 @@ contract ParamsTest is Test {
     }
 
     function test_createNoAccountsWithoutValueIsNoop() public {
-        SigpressEntry entry = new SigpressEntry(new OptimisticAggregator(1, 120));
+        SigpressEntry entry = new SigpressEntry(new OptimisticAggregator(1, 120, 0.001 ether, 60));
         assertEq(entry.createAccounts(new bytes32[](0)), 0);
         assertEq(entry.accountCount(), 0);
     }

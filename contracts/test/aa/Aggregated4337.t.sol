@@ -36,7 +36,7 @@ contract Aggregated4337Test is Test {
     function setUp() public {
         vm.createSelectFork("monad_testnet");
         require(address(EP).code.length > 0, "no EntryPoint v0.8 on fork");
-        batches = new OptimisticAggregator(0.01 ether, WINDOW);
+        batches = new OptimisticAggregator(0.01 ether, WINDOW, 0.001 ether, 60);
         sa = new SigpressAggregator4337(EP, batches);
         factory = new PQAccount4337Factory(EP, address(sa));
         for (uint256 i = 0; i < N; i++) {

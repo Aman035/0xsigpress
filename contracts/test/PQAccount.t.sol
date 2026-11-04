@@ -35,7 +35,7 @@ contract PQAccountTest is Test {
     bytes32 next1;
 
     function setUp() public {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, 0.001 ether, 60);
         factory = new PQAccountFactory(agg);
         acct = factory.create(WOTSHelper.pkHash(seed, 0), bytes32(0));
         vm.deal(aggregator, 1 ether);

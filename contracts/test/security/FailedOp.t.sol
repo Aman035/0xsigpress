@@ -21,7 +21,7 @@ contract FailedOpTest is Test {
     receive() external payable {}
 
     function setUp() public {
-        agg = new OptimisticAggregator(0.01 ether, 120);
+        agg = new OptimisticAggregator(0.01 ether, 120, 0.001 ether, 60);
     }
 
     // ---- PQAccount ----

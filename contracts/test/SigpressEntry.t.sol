@@ -59,7 +59,7 @@ contract SigpressEntryTest is Test {
     uint256[] keyIndex; // off-chain view of each account's key index (= nonce)
 
     function setUp() public {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, 0.001 ether, 60);
         entry = new SigpressEntry(agg);
         vm.deal(aggregator, 10 ether);
         vm.deal(address(this), 10 ether);
