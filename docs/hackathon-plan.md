@@ -149,3 +149,22 @@ Repo layout:
 **Go/no-go:** validity-proof version is **go on gas and size**. The critical path is now the terminal
 prover (wrap leanVM's proof of our batch into the Keccak terminal format) and binding its public input
 to our batch root. The optimistic version is live today on testnet.
+
+## Deployed contracts (Monad testnet, source verified on MonadVision / Sourcify)
+
+| Contract | Address |
+|---|---|
+| NaiveLane | [`0xcFc286564ed4281E200c6D052f9E1A932b31E845`](https://testnet.monadvision.com/address/0xcFc286564ed4281E200c6D052f9E1A932b31E845) |
+| OptimisticAggregator | [`0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E`](https://testnet.monadvision.com/address/0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E) |
+| PQAccountFactory | [`0x7335b48f2d794d4a196618916Ec196a1a1615442`](https://testnet.monadvision.com/address/0x7335b48f2d794d4a196618916Ec196a1a1615442) |
+| SigpressAggregator4337 | [`0xe6869caa26a2581880a8d237c1a1f9a26c6c212e`](https://testnet.monadvision.com/address/0xe6869caa26a2581880a8d237c1a1f9a26c6c212e) |
+| PQAccount4337Factory | [`0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`](https://testnet.monadvision.com/address/0x21d2ee544075fb5da08bc44bd9a68f6d736e6563) |
+| K4 STARK verifier (research, not ours) | `0x4fa20bd740deb7969416749dbedb5d8e5b65c4be` (not verified: third-party source without LICENSE file) |
+
+Verify more with: `forge verify-contract <addr> <path:Name> --chain 10143 --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/ [--constructor-args ...]`
+
+## Phase 3 (in progress)
+
+- [ ] Terminal prover: find/build the leanVM → Keccak terminal wrap (critical path for the STARK version) — `experiments/k10-terminal/`
+- [ ] K9 fix: compact `SigpressEntry` bundle format (root recomputed on chain, no per-op proofs), bytes/op measured on testnet
+- [ ] XMSS multi-use keys (Merkle of 2^h WOTS keys) + TS SDK with crash-safe key state + `docs/sdk.md`
