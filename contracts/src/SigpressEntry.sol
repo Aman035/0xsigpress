@@ -26,6 +26,17 @@ import {SigpressAccount} from "./SigpressAccount.sol";
 ///                 nextPkHash   32 B
 ///                 sigHash      32 B         keccak256 of the off-chain WOTS signature
 ///         Nonce and pkHash are implicit (read from the account). The WOTS signatures themselves stay off chain.
+///
+///         Dead ops: an op that can no longer run (its account already moved past it, e.g. the same signed op was
+///         run through executeDirect, or the account's key at that nonce is no longer the signing key) would make
+///         the whole batch unexecutable. Such an op is sent as a dead-op record instead, which only rebuilds its
+///         leaf and runs nothing (216 B, top bit of accountIndex set):
+///             accountIndex | 0x80000000  uint32
+///             nonce        32 B          the nonce the op was signed at
+///             pkHash       32 B          the key that signed it
+///             target 20 B ‖ value 32 B ‖ dataHash 32 B ‖ nextPkHash 32 B ‖ sigHash 32 B
+///         It is accepted only if the account's nonce is past `nonce`, or equal with a different key, so a live
+///         op can never be skipped (censored) this way.
 contract SigpressEntry {
     error Reentrancy();
     error BatchNotAccepted();
@@ -35,9 +46,14 @@ contract SigpressEntry {
     error RootMismatch();
     error CreateFailed();
     error NoAccounts();
+    error OpNotDead(uint256 position);
 
     event AccountCreated(uint256 indexed index, address indexed account, bytes32 pkHash);
     event BundleExecuted(uint256 indexed batchId, uint256 count);
+    event OpSkipped(uint256 indexed batchId, uint256 position);
+
+    uint256 internal constant DEAD_FLAG = 0x80000000;
+    uint256 internal constant DEAD_RECORD_BYTES = 216;
 
     OptimisticAggregator public immutable batches;
     SigpressAccount public immutable accountImpl;
@@ -105,7 +121,12 @@ contract SigpressEntry {
         uint256 nAccounts = accountCount;
         uint256 p = 4;
         for (uint256 i = 0; i < count; i++) {
-            (nodes[i], p) = _runOp(b, p, nAccounts);
+            if (uint32(bytes4(b[p:p + 4])) & DEAD_FLAG != 0) {
+                (nodes[i], p) = _deadOp(b, p, nAccounts, i);
+                emit OpSkipped(id, i);
+            } else {
+                (nodes[i], p) = _runOp(b, p, nAccounts);
+            }
         }
         if (p != b.length) revert BadBundle();
         if (_root(nodes) != root) revert RootMismatch();
@@ -138,6 +159,28 @@ contract SigpressEntry {
         bytes32 m = keccak256(abi.encode(block.chainid, address(this), pk, next, ph));
         leaf = keccak256(abi.encodePacked(pk, m, sigHash));
         return (leaf, p);
+    }
+
+    /// @dev Parse one dead-op record at offset p (see contract doc): check the op can never run, rebuild its leaf.
+    function _deadOp(bytes calldata b, uint256 p, uint256 nAccounts, uint256 pos)
+        internal
+        view
+        returns (bytes32 leaf, uint256)
+    {
+        bytes calldata r = b[p:p + DEAD_RECORD_BYTES];
+        uint256 index = uint32(bytes4(r[0:4])) & (DEAD_FLAG - 1);
+        if (index >= nAccounts) revert UnknownAccount(index);
+        uint256 n = uint256(bytes32(r[4:36]));
+        bytes32 pk = bytes32(r[36:68]);
+        address acct = accountOf(index);
+        uint256 cur = SigpressAccount(payable(acct)).nonce();
+        if (cur < n || (cur == n && SigpressAccount(payable(acct)).pkHash() == pk)) revert OpNotDead(pos);
+        bytes32 ph = keccak256(
+            abi.encode(acct, n, address(bytes20(r[68:88])), uint256(bytes32(r[88:120])), bytes32(r[120:152]))
+        );
+        bytes32 m = keccak256(abi.encode(block.chainid, address(this), pk, bytes32(r[152:184]), ph));
+        leaf = keccak256(abi.encodePacked(pk, m, bytes32(r[184:216])));
+        return (leaf, p + DEAD_RECORD_BYTES);
     }
 
     /// @dev Root over a power-of-two node array, hashed in place (same tree as OptimisticAggregator / merkle.ts).
