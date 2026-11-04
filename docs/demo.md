@@ -99,3 +99,57 @@ still verifies a real PQ signature on Monad, which nothing else does:
 
 Same four beats, same kill shot, smaller headline number — and the pitch is reworded to "optimistic"
 per the go/no-go table in `plan.md`.
+
+---
+
+## Running the demo
+
+One command runs all four beats against the deployed contracts on Monad testnet
+(`aggregator/deployments.json`), using `PRIVATE_KEY` from the root `.env`:
+
+```sh
+cd aggregator
+STEP=1 pnpm stage        # on stage: waits for Enter between beats
+pnpm stage               # straight through (~15-20 s)
+```
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `N` | `256` | ops in the batch (1-4096) |
+| `STEP` | off | `1` = pause for Enter before each beat |
+| `NAIVE` | off | `live` = send a fresh naive tx in Beat 3 instead of reusing the one in `results.json` |
+| `BAD_INDEX` | `7` | which signature gets the flipped bit in Beat 4 |
+| `RPC_URL`, `DEPLOYMENTS` | Monad testnet | point at anvil or another deployment |
+
+Needs at least ~0.03 MON (two 0.01 MON bonds plus gas; the tamper bond comes back to the challenger).
+Every run uses fresh keys, so it can be repeated. Results go to `aggregator/out/results.json` and
+`web/public/results.json` (same shape as before, plus a `stage` field with tx hashes and timestamps).
+
+**Expected output** (testnet run, 4 Nov 2026, N=256):
+
+```
+BEAT 1  What post-quantum signatures do to a Monad block  [CAPACITY MODEL, not live TPS]
+  ECDSA (today)                                3,750 tx/block
+  ML-DSA-44, sig + pk                            369 tx/block
+  our naive WOTS (measured 2,276 B calldata)     659 tx/block
+BEAT 2  Sign 256 post-quantum ops, put ONE batch on chain  [LIVE on Monad testnet]
+  signed 256 WOTS ops (keygen + sign + Merkle root) in ~4-8 s
+  submitBatch https://testnet.monadexplorer.com/tx/0x1078…
+  gas charged 110,494 (432 gas/op) · calldata 228 B → 0.89 B/op
+BEAT 3  Naive post-quantum vs Sigpress batch  [LIVE on Monad testnet]
+  bytes on chain per op      2,276 B   vs   0.89 B
+BEAT 4  Flip ONE bit in ONE of 256 signatures  [LIVE on Monad testnet]
+  challenger re-checks all 256 signatures off chain in ~40 ms → signature #7 is INVALID
+  BATCH REJECTED, bond slashed
+```
+
+**What is live and what is a model:**
+- Live on Monad testnet, with explorer links printed: the batch `submitBatch`, the naive tx (reused
+  from `results.json` unless `NAIVE=live`), the tampered `submitBatch` and the `challenge` that slashes it.
+- Capacity model, labelled on screen: Beat 1 (K1 block-capacity arithmetic from MIP-12 caps and FIPS 204
+  sizes; the WOTS row uses our measured calldata) and the "PQ ops/block" row in Beat 3, which counts
+  signature bytes only and ignores each op's execution gas. Neither is measured throughput.
+- Gas figures are gas *charged*: Monad charges the gas limit, and our writes add a 30% buffer to viem's
+  estimate, so a fresh naive tx shows ~143k rather than the earlier 118,606 (set without the buffer).
+- This is the **optimistic** path (K7 fallback), not the STARK validity proof: signatures are checked
+  off chain and fraud is caught by a bonded challenge within the window.
