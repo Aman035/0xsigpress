@@ -92,8 +92,8 @@ All commands run from `aggregator/`, so each line below `cd`s there first.
 ```sh
 cd aggregator && pnpm install                            # first time only
 
-# terminal 1 — the aggregator service (fast 8-second window instance)
-cd aggregator && SERVICE_DEPLOYMENTS=deployments-wallet.json KEY_VAR=PRIVATE_KEY_K13 pnpm service  # wait for http://127.0.0.1:8547
+# terminal 1 — the aggregator service (fast 8-second window instance baked in)
+cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm wallet:service   # wait for http://127.0.0.1:8547
 
 # terminal 2 — the wallet (serves the UI, signs, relays) — start AFTER the service is up
 cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm wallet      # then open http://127.0.0.1:8550
