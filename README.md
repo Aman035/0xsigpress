@@ -98,18 +98,35 @@ cd aggregator && pnpm install && pnpm test
 
 ## How it works
 
-```
- user keys (WOTS)          aggregator (viem)              Monad testnet (Solidity)
- ...............           .................              ........................
- sign each op       ──────> batch N signed ops            NaiveLane.submit        (naive lane)
-                            build Merkle root  root+bond>  OptimisticAggregator.submitBatch
- challenger         leaf+sig ...........................>  verify 1 WOTS sig, slash  (tamper beat)
- web/ demo page     <...... deployments.json + results    PQAccount executes from finalized batch
+Users keep signing every operation with a post-quantum key. The aggregator batches those operations and
+gives Monad **one thing to check** instead of thousands of signatures, on either of two paths:
+
+```mermaid
+flowchart LR
+  U["User wallet<br/>signs each op with a<br/>post-quantum key"] --> AGG["Aggregator<br/>collects a batch of<br/>signed operations"]
+  AGG -->|"optimistic path:<br/>32-byte root + bond"| OPT["Monad: OptimisticAggregator<br/>anyone can challenge a bad<br/>signature and slash the bond"]
+  AGG -->|"validity path:<br/>one hash-based STARK"| STK["Monad: STARK verifier<br/>checks all N signatures<br/>in a single transaction"]
+  OPT --> EXE["PQ account executes<br/>from a finalized batch"]
+  STK --> EXE
 ```
 
-The proof is hash-based end to end (Keccak Merkle + Fiat-Shamir + a WHIR commitment): **no pairings, no
-trusted setup, no BLS, no Groth16.** That's why it's quantum-safe, unlike the Groth16/PLONK SP1 gateways
-already on Monad.
+The proof is hash-based end to end (Keccak Merkle + Fiat-Shamir + a WHIR commitment): no pairings, no
+trusted setup, no BLS, no Groth16. That is what makes it quantum-safe, unlike the Groth16/PLONK SP1
+gateways already on Monad.
+
+**Inside the validity path**, a whole batch of signatures collapses into one small proof that the
+contract checks cheaply:
+
+```mermaid
+flowchart LR
+  A["N post-quantum<br/>signatures"] --> B["leanVM proves<br/>every signature valid"]
+  B --> C["recursion + lift"]
+  C --> D["Keccak terminal<br/>proof, about 110 KB"]
+  D --> E["On-chain verifier on Monad<br/>one tx, about 12.2M gas"]
+  E --> F{"proof valid?"}
+  F -->|"yes"| G["batch accepted"]
+  F -->|"one bit flipped"| H["transaction reverts"]
+```
 
 ---
 
@@ -132,25 +149,33 @@ already on Monad.
 
 ## Honest limits
 
-- **Validity proof is early.** The STARK chain verifies our own signature batches on Monad, but today:
-  the batch-root to proof link is set by one trusted address, all signers in a batch sign one message,
-  it uses the older Poseidon leanXMSS (not our Keccak WOTS), and proving takes ~40 to 60 s on a laptop.
-  The live product path is still the optimistic one (root + bond + challenge window).
-- **Stateful keys.** Hash-based one-time keys must never be reused; the account rotates per op.
-- **Every number** here is measured on Monad testnet (tx hashes on the explorer) or labelled a capacity
-  model.
+- **The validity proof is a working prototype, not the shipped path yet.** It already verifies real
+  signature batches on Monad, and a few things still need hardening: the link from a batch to its proof
+  is set by a trusted helper today rather than trustlessly on chain, every signer in a batch signs the
+  same message (real apps need one message per operation), the prototype uses a research key format
+  instead of our production keys, and proving a batch takes about a minute. Until those close, the live
+  product path stays the simpler optimistic one.
+- **Keys are single-use.** Hash-based signatures use one-time keys, so the wallet rotates to a fresh key
+  on every operation and never reuses one.
+- **Every figure is real.** Each number is measured on Monad testnet with a transaction you can open, or
+  clearly marked as a capacity model.
 
 ---
 
 ## Contracts
 
-Verified on MonadVision / Sourcify (chain 10143):
+**Deployed by us** (chain 10143, source-verified on MonadVision / Sourcify):
 
 - **NaiveLane** `0xcFc286564ed4281E200c6D052f9E1A932b31E845`
 - **OptimisticAggregator** `0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E`
 - **PQAccountFactory** `0x7335b48f2d794d4a196618916Ec196a1a1615442`
 - **SigpressAggregator4337** `0xe6869caa26a2581880a8d237c1a1f9a26c6c212e`
 - **PQAccount4337Factory** `0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`
+
+**Pre-existing infrastructure we build on (not ours):** the canonical ERC-4337 EntryPoint v0.8
+(`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`, the standard cross-chain deployment, already live on
+Monad) and Monad's own native P-256 precompile. Our on-chain STARK verifier is generated from the
+third-party `sol-spartan-whir` research code, not written by us.
 
 Layout: `contracts/` (Solidity), `aggregator/` (TS aggregator + SDK), `web/` (demo page).
 

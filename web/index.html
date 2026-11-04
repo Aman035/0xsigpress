@@ -281,13 +281,13 @@ function proof(ex,hash){
   document.getElementById("exDirect").textContent = fmt(res.execute?.directGas)+" gas";
   document.getElementById("exFin").innerHTML = res.execute?.finalizeTx?proof(ex,res.execute.finalizeTx):"—";
 
-  const nb = (res.validity?.notBound && res.validity.notBound.length)
-    ? res.validity.notBound
-    : ["batch-root to proof link is set by a trusted registrar today",
-       "one shared message per batch, not per-operation messages yet",
-       "uses Poseidon leanXMSS test keys, not our Keccak WOTS accounts",
-       "proving takes about a minute on a laptop; the live product path stays optimistic"];
-  document.getElementById("limits").innerHTML = nb.map(t=>`<li>${t}</li>`).join("");
+  const limits = [
+    "The link from a batch to its proof is set by a trusted helper today, not yet trustlessly on chain.",
+    "Every signer in a batch signs one shared message; real apps need a message per operation.",
+    "The prototype uses a research key format, not our production post-quantum accounts yet.",
+    "Proving a batch takes about a minute, so the live product path stays the optimistic one for now."
+  ];
+  document.getElementById("limits").innerHTML = limits.map(t=>`<li>${t}</li>`).join("");
 })();
 </script>
 </body>
