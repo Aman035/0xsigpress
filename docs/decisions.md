@@ -512,3 +512,7 @@ Comparisons:
 - **Decision:** one deployed fixed-shape verifier serves both a full and a padded small batch on Monad,
   at ~12.2M gas per submit regardless of N (up to 256 per child). Binding gaps are unchanged and
   now owned in `experiments/k10-terminal/binding/`.
+- **Update (padded batch sent as a tx):** padded 2 × 4 (run `n4pad256b`) `submit` to the same 2 × 256 gate
+  `0xdf9bfc6a96fb36cef902eb9e95a65da4b5a94c8e`: tx `0xe7574c9d313869d10b0b347a29f1f85a4f78f640a4fb2208f66a3e57ed0a84e4`,
+  status 1, estimate 12,178,749, charged 12,787,686, `accepted` = true. So one fixed-shape verifier on Monad
+  accepts both a full 512-signature batch and a padded 8-signature batch.

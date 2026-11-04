@@ -14,3 +14,8 @@
 {"step":"full_2x256_eth_call_submit","result":"0x","estimate":"12195486","calldata_bytes":106692}
 {"step":"full_2x256_submit_tx","r":{"status":"0x1","gasUsed":"0xc3648c","transactionHash":"0x02d582dede07fd5646f64fbba959678401d792d7422dc38ba79cde5219189021","estimate":"12195486"}}
 {"step":"full_2x256_accepted","result":"true"}
+{"step":"padded_2x4_app_root_offchain_match","result":true,"left":"0xc78a04c6003b9509252d737361f2a1176c0b03b096eddcb4e562896476ffd6f1","right":"0x0feb6d76b276c1ad1c48781115f0100b38a3a157843d62ba69a6864492fb061f"}
+{"step":"padded_2x4_eth_call_verifyC1V1","result":"0x0000000000000000000000000000000000000000000000000000000000000001","estimate":"12018281","calldata_bytes":106276}
+{"step":"padded_2x4_eth_call_submit","result":"0x","estimate":"12178749","calldata_bytes":106340}
+{"step":"padded_2x4_submit_tx","r":{"status":"0x1","gasUsed":"0xc31fe6","transactionHash":"0xe7574c9d313869d10b0b347a29f1f85a4f78f640a4fb2208f66a3e57ed0a84e4","estimate":"12178749"}}
+{"step":"padded_2x4_accepted","result":"true"}
