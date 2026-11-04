@@ -1,0 +1,21 @@
+// XMSSAccount ABI (generated from contracts/out/XMSSAccount.sol/XMSSAccount.json, internalType stripped).
+export const xmssAccountAbi = [
+  {"type":"constructor","inputs":[{"name":"aggregator_","type":"address"},{"name":"root_","type":"bytes32"},{"name":"height_","type":"uint256"}],"stateMutability":"nonpayable"},
+  {"type":"receive","stateMutability":"payable"},
+  {"type":"function","name":"aggregator","inputs":[],"outputs":[{"name":"","type":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"capacity","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"executeDirect","inputs":[{"name":"leafIndex","type":"uint256"},{"name":"leafPk","type":"bytes32"},{"name":"target","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"},{"name":"wotsSig","type":"bytes"},{"name":"authPath","type":"bytes32[]"}],"outputs":[{"name":"","type":"bytes"}],"stateMutability":"nonpayable"},
+  {"type":"function","name":"executeFromBatch","inputs":[{"name":"batchId","type":"uint256"},{"name":"leafIndex","type":"uint256"},{"name":"leafPk","type":"bytes32"},{"name":"authPath","type":"bytes32[]"},{"name":"target","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"},{"name":"index","type":"uint256"},{"name":"proof","type":"bytes32[]"},{"name":"sigHash","type":"bytes32"}],"outputs":[{"name":"","type":"bytes"}],"stateMutability":"nonpayable"},
+  {"type":"function","name":"height","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"isUsed","inputs":[{"name":"leafIndex","type":"uint256"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"messageFor","inputs":[{"name":"leafIndex","type":"uint256"},{"name":"target","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"}],"outputs":[{"name":"","type":"bytes32"}],"stateMutability":"view"},
+  {"type":"function","name":"nonce","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"payloadHashOf","inputs":[{"name":"target","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"}],"outputs":[{"name":"","type":"bytes32"}],"stateMutability":"view"},
+  {"type":"function","name":"root","inputs":[],"outputs":[{"name":"","type":"bytes32"}],"stateMutability":"view"},
+  {"type":"function","name":"verify","inputs":[{"name":"m","type":"bytes32"},{"name":"leafIndex","type":"uint256"},{"name":"leafPk","type":"bytes32"},{"name":"wotsSig","type":"bytes"},{"name":"authPath","type":"bytes32[]"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+  {"type":"event","name":"Executed","inputs":[{"name":"nonce","type":"uint256","indexed":true},{"name":"leafIndex","type":"uint256","indexed":true},{"name":"target","type":"address","indexed":false},{"name":"value","type":"uint256","indexed":false},{"name":"batched","type":"bool","indexed":false}],"anonymous":false},
+  {"type":"error","name":"BadHeight","inputs":[]},
+  {"type":"error","name":"InvalidSignature","inputs":[]},
+  {"type":"error","name":"LeafUsed","inputs":[{"name":"leafIndex","type":"uint256"}]},
+  {"type":"error","name":"NotAccepted","inputs":[]},
+] as const;
