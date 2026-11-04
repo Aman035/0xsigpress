@@ -13,7 +13,8 @@
     "execute": "tsx scripts/execute.ts",
     "stage": "tsx scripts/stage.ts",
     "aa": "tsx scripts/aa.ts",
-    "compact": "tsx scripts/compact.ts"
+    "compact": "tsx scripts/compact.ts",
+    "validity": "tsx scripts/validity.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
