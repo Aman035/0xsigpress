@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Generate binding/src/Poseidon1Hasher.sol: a standalone contract whose fallback applies leanVM's
+Poseidon1 permutation (KoalaBear, width 16, x^3, 8 full + 20 partial rounds) to 16 calldata words and
+returns the 16 permuted words.
+
+Algorithm = sol-whir-p3's LeanVmPoseidon1.sol (MIT SPDX header): dense circulant MDS in full rounds,
+sparse factorisation in partial rounds; constants read from its LeanVmPoseidonAirConstants.sol. Our
+changes are code shape only: fixed memory addresses (own contract), literal constants, the circulant
+MDS computed on 4 x 64-bit packed lanes (16 multiplies instead of 256 per output block), and the
+partial-round tail kept as 2 x 128-bit lanes (dot products via one multiply per lane pair).
+Usage: gen_poseidon1.py VENDOR_SOL_WHIR_P3_DIR OUT.sol
+"""
+import re
+import sys
+from pathlib import Path
+
+src = Path(sys.argv[1]) / "src/leanvm/LeanVmPoseidonAirConstants.sol"
+hexs = re.search(r'hex"([0-9a-f]+)"', src.read_text()).group(1)
+C = [int(hexs[i:i + 8], 16) for i in range(0, len(hexs), 8)]
+MDS = [1, 1, 51, 1, 11, 17, 2, 1, 101, 63, 15, 2, 67, 22, 13, 3]
+P = 2130706433
+S = 0x100          # 16 scalar state words
+R = 0x400          # 16 packed rotation words (ROT_r[q] at R + 32*(4r+q))
+U = 0x900          # 16 scratch words for the M_I outputs
+T = 0x700          # 8 packed tail words (lanes: low = elem 2w+1, high = elem 2w+2)
+X128 = 1 << 128
+M64 = (1 << 64) - 1
+M128 = (1 << 128) - 1
+
+out = []
+e = out.append
+
+
+def s(i):
+    return hex(S + 32 * i)
+
+
+def full_round(rc):
+    # S-box in place
+    for i in range(16):
+        e(f"{{ let x := addmod(mload({s(i)}), {C[rc + i]}, p) mstore({s(i)}, mod(mul(mul(x, x), x), p)) }}")
+    # packed rotations: ROT_r[q] lane l = s[(4q + l + r) % 16]
+    for r in range(4):
+        for q in range(4):
+            idx = [(4 * q + l + r) % 16 for l in range(4)]
+            e(f"mstore({hex(R + 32 * (4 * r + q))}, or(or(or(mload({s(idx[0])}), shl(64, mload({s(idx[1])}))), "
+              f"shl(128, mload({s(idx[2])}))), shl(192, mload({s(idx[3])}))))")
+    # out_q = sum_k c_k * ROT_{k%4}[(q + k//4) % 4]; lanes stay < 371 * 2^31 < 2^40
+    for q in range(4):
+        e("{")
+        terms = []
+        for k in range(16):
+            m, r = divmod(k, 4)
+            w = f"mload({hex(R + 32 * (4 * r + (q + m) % 4))})"
+            terms.append(w if MDS[k] == 1 else f"mul({w}, {MDS[k]})")
+        e(f"let o := {terms[0]}")
+        for t in terms[1:]:
+            e(f"o := add(o, {t})")
+        for l in range(4):
+            lane = "o" if l == 0 else f"shr({64 * l}, o)"
+            if l < 3:
+                lane = f"and({lane}, {hex(M64)})"
+            e(f"mstore({s(4 * q + l)}, mod({lane}, p))")
+        e("}")
+
+
+e("let p := 2130706433")
+e(f"calldatacopy({hex(S)}, 0, 512)")
+for r in range(4):
+    full_round(16 * r)
+# sparse prologue: state += RC, then M_I = diag(1, B) on the tail (unreduced, < 30p^2)
+for i in range(16):
+    e(f"mstore({s(i)}, add(mload({s(i)}), {C[128 + i]}))")
+tail = {}
+for i in range(1, 16):
+    terms = [f"mul(mload({s(j)}), {C[144 + 16 * i + j]})" for j in range(1, 16)]
+    e(f"{{ let t := {terms[0]}")
+    for t in terms[1:]:
+        e(f"t := add(t, {t})")
+    e(f"mstore({hex(U + 32 * i)}, t) }}")
+# pack tail: word w = elem(2w+1) | elem(2w+2) << 128 (elem 16 = 0)
+for w in range(8):
+    lo, hi = 2 * w + 1, 2 * w + 2
+    tl, th = f"mload({hex(U + 32 * lo)})", f"mload({hex(U + 32 * hi)})"
+    e(f"mstore({hex(T + 32 * w)}, {f'or({tl}, shl(128, {th}))' if hi < 16 else tl})")
+e(f"let x0 := mload({s(0)})")
+for r in range(20):
+    e("{")
+    e("let x := mod(mul(mul(x0, x0), x0), p)")
+    if r < 19:
+        e(f"x := add(x, {C[400 + r]})")
+    fr, v = 419 + 16 * r, 739 + 16 * r
+    # next0 = x + sum_j tail_j * fr_j ; with tail word W = a + b*2^128 and F = f_b + f_a*2^128,
+    # shr(128, W*F) = a*f_a + b*f_b (all products < 2^100, so no lane overflow; the 2^256 term wraps away)
+    e("let n0 := x")
+    for w in range(8):
+        a, b = 2 * w + 1, 2 * w + 2
+        fa = C[fr + a]
+        fb = C[fr + b] if b < 16 else 0
+        e(f"n0 := add(n0, shr(128, mul(mload({hex(T + 32 * w)}), {hex(fb + fa * X128)})))")
+    # tail_j += x * v_j (packed: lanes < 2^69 + 20 * 2^62 < 2^128)
+    for w in range(8):
+        a, b = 2 * w + 1, 2 * w + 2
+        va = C[v + a - 1]
+        vb = C[v + b - 1] if b < 16 else 0
+        e(f"mstore({hex(T + 32 * w)}, add(mload({hex(T + 32 * w)}), mul(x, {hex(va + vb * X128)})))")
+    e("x0 := mod(n0, p)")
+    e("}")
+e(f"mstore({s(0)}, x0)")
+for w in range(8):
+    a, b = 2 * w + 1, 2 * w + 2
+    e(f"{{ let W := mload({hex(T + 32 * w)}) mstore({s(a)}, and(W, {hex(M128)}))"
+      + (f" mstore({s(b)}, shr(128, W))" if b < 16 else "") + " }")
+for r in range(4):
+    full_round(64 + 16 * r)
+e(f"return({hex(S)}, 512)")
+
+body = "\n".join("            " + l for l in out)
+sol = f"""// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+// Generated by binding/tools/gen_poseidon1.py from sol-whir-p3's LeanVmPoseidonAirConstants.sol (MIT SPDX).
+/// Poseidon1 / KoalaBear, width 16, cubic S-box, 8 full + 20 partial rounds (leanVM's poseidon16 permutation).
+/// Call with exactly 16 words (any uint256; normalised mod p by the first round); returns 16 canonical words.
+contract Poseidon1Hasher {{
+    fallback() external {{
+        assembly {{
+{body}
+        }}
+    }}
+}}
+"""
+Path(sys.argv[2]).write_text(sol)
