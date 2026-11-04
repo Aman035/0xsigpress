@@ -17,6 +17,7 @@ export interface Deployments {
   chainId: number;
   naiveLane: Address;
   aggregator: Address;
+  factory?: Address;
   explorer: string;
 }
 

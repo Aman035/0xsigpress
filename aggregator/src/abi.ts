@@ -68,6 +68,7 @@ export const aggregatorAbi = [
     outputs: [{ name: "", type: "bool" }],
   },
   { type: "function", name: "bond", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "window", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
   {
     type: "function",
     name: "batches",
@@ -106,4 +107,85 @@ export const aggregatorAbi = [
   ...["WrongBond", "UnknownBatch", "WindowClosed", "WindowOpen", "AlreadySlashed", "AlreadyFinalized", "NotInBatch", "SignatureValid", "TransferFailed"].map(
     (name) => ({ type: "error" as const, name, inputs: [] as const }),
   ),
+] as const;
+
+export const pqAccountAbi = [
+  {
+    type: "function",
+    name: "executeFromBatch",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "batchId", type: "uint256" },
+      { name: "nextPkHash", type: "bytes32" },
+      { name: "target", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "data", type: "bytes" },
+      { name: "index", type: "uint256" },
+      { name: "proof", type: "bytes32[]" },
+      { name: "sigHash", type: "bytes32" },
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+  },
+  {
+    type: "function",
+    name: "executeDirect",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "nextPkHash", type: "bytes32" },
+      { name: "target", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "data", type: "bytes" },
+      { name: "sig", type: "bytes" },
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+  },
+  { type: "function", name: "pkHash", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "bytes32" }] },
+  { type: "function", name: "nonce", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "aggregator", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  {
+    type: "event",
+    name: "Executed",
+    inputs: [
+      { name: "nonce", type: "uint256", indexed: true },
+      { name: "pkHash", type: "bytes32", indexed: true },
+      { name: "nextPkHash", type: "bytes32", indexed: false },
+      { name: "target", type: "address", indexed: false },
+      { name: "value", type: "uint256", indexed: false },
+      { name: "batched", type: "bool", indexed: false },
+    ],
+  },
+  { type: "error", name: "NotAccepted", inputs: [] },
+  { type: "error", name: "InvalidSignature", inputs: [] },
+] as const;
+
+export const pqAccountFactoryAbi = [
+  {
+    type: "function",
+    name: "create",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "pkHash", type: "bytes32" },
+      { name: "salt", type: "bytes32" },
+    ],
+    outputs: [{ name: "account", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "addressOf",
+    stateMutability: "view",
+    inputs: [
+      { name: "pkHash", type: "bytes32" },
+      { name: "salt", type: "bytes32" },
+    ],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "event",
+    name: "AccountCreated",
+    inputs: [
+      { name: "account", type: "address", indexed: true },
+      { name: "pkHash", type: "bytes32", indexed: true },
+      { name: "salt", type: "bytes32", indexed: false },
+    ],
+  },
 ] as const;
