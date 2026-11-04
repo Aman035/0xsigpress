@@ -1,6 +1,6 @@
 <div align="center">
 
-# Sigpress
+# 0xsigpress
 
 ### Post-quantum signatures without losing Monad's throughput
 
@@ -10,7 +10,7 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 [![Monad testnet](https://img.shields.io/badge/Monad-testnet%20(10143)-836EF9)](https://testnet.monadexplorer.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built at](https://img.shields.io/badge/built%20at-Monad%20Blitz-111)](https://blitz.devnads.com)
-[![Demo](https://img.shields.io/badge/demo-live-836EF9)](https://sumithprabhu.github.io/sigpress/)
+[![Demo](https://img.shields.io/badge/demo-live-836EF9)](https://sumithprabhu.github.io/0xsigpress/)
 
 </div>
 
@@ -20,9 +20,9 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 
 | | |
 |---|---|
-| **Project name** | Sigpress |
+| **Project name** | 0xsigpress |
 | **One-line description** | Post-quantum signature aggregation for Monad: thousands of hash-based signatures verified in one STARK transaction, so quantum-safe accounts don't eat block space. |
-| **Live URL** | https://sumithprabhu.github.io/sigpress/ |
+| **Live URL** | https://sumithprabhu.github.io/0xsigpress/ |
 | **Deployment network** | Monad testnet (chain ID `10143`, RPC `https://testnet-rpc.monad.xyz`) |
 | **Main contract** | `SigpressValidityGate` (STARK, 2,048 signers per tx) at [`0x5648caea56baa011b6685ce091089b561621a661`](https://testnet.monadvision.com/address/0x5648caea56baa011b6685ce091089b561621a661) |
 | **Other contracts** | `OptimisticAggregator` [`0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978`](https://testnet.monadvision.com/address/0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978), `SigpressEntry` [`0x041734ddcC0320f546F924AD1D3CDC5a023D04e0`](https://testnet.monadvision.com/address/0x041734ddcC0320f546F924AD1D3CDC5a023D04e0); full list in [Contracts](#contracts) |
@@ -32,7 +32,7 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 Requirements: [Foundry](https://getfoundry.sh), Node 22+ and pnpm. Rust nightly only for the STARK prover.
 
 ```sh
-git clone https://github.com/sumithprabhu/sigpress && cd sigpress
+git clone https://github.com/sumithprabhu/0xsigpress && cd 0xsigpress
 cd contracts && forge test && cd ..                 # Solidity tests
 cd aggregator && pnpm install && pnpm test && cd .. # TS aggregator + SDK tests
 echo "PRIVATE_KEY=0x<funded Monad testnet key>" > .env
@@ -108,7 +108,7 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 
 ## Try it
 
-**Live demo page (animated run, shareable): https://sumithprabhu.github.io/sigpress/**
+**Live demo page (animated run, shareable): https://sumithprabhu.github.io/0xsigpress/**
 
 ### Interactive wallet — send a real post-quantum transfer on Monad testnet
 
