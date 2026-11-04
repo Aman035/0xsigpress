@@ -10,7 +10,8 @@
     "naive": "tsx scripts/naive.ts",
     "demo": "tsx scripts/demo.ts",
     "tamper": "tsx scripts/tamper.ts",
-    "execute": "tsx scripts/execute.ts"
+    "execute": "tsx scripts/execute.ts",
+    "stage": "tsx scripts/stage.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
