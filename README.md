@@ -87,15 +87,16 @@ A browser wallet that sends real transfers through the aggregator service to Mon
 (the one-time key, the signed message, the 2,144-byte signature, the batch root, and every tx). Needs a
 funded key in the root `.env` (`PRIVATE_KEY_K13`).
 
+All commands run from `aggregator/`, so each line below `cd`s there first.
+
 ```sh
-cd aggregator
-pnpm install                                 # first time only
+cd aggregator && pnpm install                            # first time only
 
 # terminal 1 — the aggregator service (batches and submits to Monad)
-KEY_VAR=PRIVATE_KEY_K13 pnpm service          # http://127.0.0.1:8547
+cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm service     # wait for http://127.0.0.1:8547
 
-# terminal 2 — the wallet (serves the UI, signs, relays)
-KEY_VAR=PRIVATE_KEY_K13 pnpm wallet           # open http://127.0.0.1:8550
+# terminal 2 — the wallet (serves the UI, signs, relays) — start AFTER the service is up
+cd aggregator && KEY_VAR=PRIVATE_KEY_K13 pnpm wallet      # then open http://127.0.0.1:8550
 ```
 
 Open **http://127.0.0.1:8550**, pick a post-quantum account, and send. Watch it go signed → queued →
