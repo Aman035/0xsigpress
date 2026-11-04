@@ -643,3 +643,31 @@ Comparisons:
 - **Decision:** binding is no longer the bottleneck: at 512 signers the tx is ~31k gas per signer charged,
   dominated by the flat ~12.1M verifier. Use v2 as the binding design. Next: account binding (registry or 4337
   account check), one fixed-shape verifier with padding, and an independent review of the soundness argument.
+
+## Security fixes R1-R3 (4 Nov 2026)
+
+- **Test:** the three design-level residuals from `docs/security-review.md`, each fixed test-first (the
+  `Residual.t.sol` test flipped, plus `RevealGame.t.sol`, `FailedOp.t.sol`, invariants). Commands:
+  `cd contracts && forge test` (112/112, incl. the fork suite) and `cd aggregator && pnpm test` (43/43,
+  incl. the anvil e2e of service + watchtower) + `pnpm typecheck`.
+- **SR-R1 (data withholding):** `OptimisticAggregator` gets a reveal game: `requestReveal` (deposit) ->
+  `reveal` within `revealWindow` (valid: refund; invalid: slash) or `slashUnrevealed` after it; `finalize`
+  blocked while a request is open and not before the last reveal deadline. Watchtower demands every leaf of
+  a batch with missing DA and slashes unanswered ones; the service answers requests on its own batches
+  (`revealer.ts`). Measured on anvil e2e: a 3-leaf batch with no data anywhere is slashed by the watchtower
+  after the reveal deadline; a reveal request on an honest service batch is answered and the batch still
+  executes. Local gas (forge, inner call): requestReveal ≤ ~96k, reveal ≤ ~217k, slashUnrevealed ≤ ~97k.
+- **SR-R2 (free failed fraud):** every slash pays bond/2 to the challenger/requester and burns the rest
+  (`0x…dEaD`). Self-challenge now costs half the bond.
+- **SR-R3 (failed PQAccount op stays live):** PQAccount and XMSSAccount use the op up on a failed call
+  (`ExecutionFailed` with the revert data), keeping the SR-04 out-of-gas guard. PQAccount4337 does not need
+  it (EntryPoint nonce + key rotation in validation).
+- **Bond sizing:** a challenge cost ~0.021 MON on testnet (service run, not re-measured) vs a 0.001 MON bond.
+  Rule: bond/2 ≥ ~10x worst-case challenge/slash gas cost. Deploy defaults now bond 0.5 MON, revealDeposit
+  0.05 MON, revealWindow 60 s.
+- **OP_GAS_LIMIT overhead, measured (forge):** min gas limit − used = 236,775 / 221,625 / 203,902 at
+  4 / 32 / 64 ops: a one-time ~200-240k per bundle, not per op. The service's ×1.25 `GAS_MULT` makes it ~300k
+  charged.
+- **Decision:** fixes are in, nothing redeployed. Remaining DA limits (an honest funded watcher must be
+  online; refunded requests can grief the aggregator) are listed in `docs/security-review.md`. Redeploy
+  order is in its "Redeploy checklist".

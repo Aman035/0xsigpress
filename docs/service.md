@@ -39,6 +39,8 @@ Tests: `pnpm test` runs `test/service.test.ts` (an in-memory fake chain that reb
 | `FALLBACK_MS` | `60000` | an op still not batched after this long goes on chain alone via `executeDirect` (`0` turns this off) |
 | `TICK_MS` | `500` | state-machine poll interval |
 | `GAS_MULT` | `1.25` | gas limit = estimate × this. Monad charges the limit, so keep it tight |
+| `REVEALER` | on | `0` turns off answering `requestReveal` on our batches. Leave it on: an unanswered request lets anyone slash our batch for half the bond |
+| `REVEAL_KEY_VAR` | `KEY_VAR` | key that pays `reveal` gas (any key may answer; a separate one avoids nonce races with the batcher) |
 | `SERVICE_DIR` | `out/service/<chainId>-<entry>/` | state and DA files |
 | `RPC_RETRY_COUNT` / `RPC_RETRY_DELAY_MS` | `3` / `150` | viem retry backoff. The public testnet RPC returns HTTP 429; `7` / `400` worked |
 
@@ -52,6 +54,8 @@ Tests: `pnpm test` runs `test/service.test.ts` (an in-memory fake chain that reb
 | `FROM_BLOCK` | latest − 1000 | first block to scan; after that it resumes from its state file |
 | `POLL_MS` / `LOG_CHUNK` | `2000` / `100` | `eth_getLogs` is chunked for RPC range limits |
 | `WATCH_STATE` | `out/service/watchtower-<aggregator>.json` | |
+| `REVEAL` | `1` | on missing DA, `requestReveal` every leaf, then `slashUnrevealed` past each deadline. `0` = only log |
+| `REVEAL_MAX` | batch size | leaves demanded per batch (each locks `revealDeposit` until answered) |
 
 ## API
 
@@ -114,7 +118,9 @@ Before an op is accepted, the service checks the shape (sig exactly 2,144 B, dat
 - **The bond is too small to pay for challenges.** On testnet the bond is 0.001 MON. One `challenge` tx was charged 204,987 gas at 102 gwei, about 0.021 MON, roughly 20 times the bond. So a watchtower loses money on every challenge. The bond deters nothing and does not pay challengers. It must be sized above challenge gas (more, if it is meant to deter) before this is more than a demo.
 - **Self-challenge.** The bond goes to whoever challenges, so an aggregator can challenge its own bad batch and get the bond back. Slashing then costs it only gas. The batch is still blocked, which is what protects users.
 
-## The DA caveat (the known hole)
+## The DA caveat (was the known hole; now a reveal game, SR-R1)
+
+**Update (SR-R1 fix, contracts not yet redeployed):** the new `OptimisticAggregator` lets anyone force a leaf's signature on chain with `requestReveal(id, index)` (pays `revealDeposit`). If nobody answers with `reveal(...)` within `revealWindow`, anyone calls `slashUnrevealed`; `finalize` waits for every open request. The watchtower now does this automatically for batches whose DA is missing, and the service's revealer answers requests on its own batches from its DA store. Self-challenge now also loses half the bond (SR-R2). See `docs/security-review.md` for the limits (an honest watcher must still be online and funded; refunded requests can grief the aggregator). The text below describes the deployed (pre-fix) contracts.
 
 The service serves the signatures itself, and the same operator posts the batch. A dishonest aggregator would simply not publish them. If nobody can fetch a batch's signatures, nobody can challenge it, it finalizes, and a forged op inside it executes. That is theft, not just delay. The watchtower cannot fix this. It can only shout:
 
