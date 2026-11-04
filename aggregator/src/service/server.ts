@@ -5,6 +5,7 @@
 //   GET  /da/:root       the batch's signatures (data availability for challengers)
 //   GET  /health
 // Run: KEY_VAR=PRIVATE_KEY_K13 pnpm service   (see docs/service.md for every env var)
+//      MODE=validity SHAPE=2x256 pnpm service   the STARK path instead (src/service/validity-service.ts)
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -169,6 +170,9 @@ export function serviceDeployments(): { path: string; entry: Address; explorer?:
 }
 
 async function main() {
+  // MODE=validity: the trustless STARK path (validity-service.ts). Default: optimistic (this file).
+  if (process.env.MODE === "validity") return (await import("./validity-service.ts")).validityMain();
+  if (process.env.MODE && process.env.MODE !== "optimistic") throw new Error("MODE must be optimistic (default) or validity");
   const dep = serviceDeployments();
   const chain = await viemChain({ entry: dep.entry });
   const num = (k: string, d: number) => (process.env[k] ? Number(process.env[k]) : d);

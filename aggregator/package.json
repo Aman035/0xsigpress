@@ -15,6 +15,8 @@
     "aa": "tsx scripts/aa.ts",
     "compact": "tsx scripts/compact.ts",
     "validity": "tsx scripts/validity.ts",
+    "validity:deploy": "tsx scripts/validity-deploy.ts",
+    "validity:demo": "tsx scripts/validity-service-demo.ts",
     "service": "tsx src/service/server.ts",
     "watchtower": "tsx src/service/watchtower.ts",
     "service:demo": "tsx scripts/service-demo.ts",
