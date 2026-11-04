@@ -134,5 +134,57 @@
       "security = the authors' 100-bit component targets; full-chain composition not analysed"
     ],
     "proofDir": "out/validity/2026-11-04T09-42-32-561Z-2x256-n256"
+  },
+  "validitySdk": {
+    "txHash": "0x08957c47f9638ad29a3ebff6f2b6de1fd7e80562388cde8500a42919940f152d",
+    "gasEstimate": 12202181,
+    "gasCharged": 12812290,
+    "calldataBytes": 106884,
+    "signatures": 32,
+    "perChild": 16,
+    "gasPerSignature": 400384,
+    "bytesPerSignature": 3340.1,
+    "proofBytes": 111109,
+    "verifyCalldataBytes": 106820,
+    "proveSeconds": 54.7,
+    "verifier": "0xf563BB0b43d6090C89D45a7A780c8AB0175d92d2",
+    "gate": "0xE2BFD06CC8677df23909dD4ee801b2A9D286f119",
+    "shape": "2x256",
+    "leftBatchRoot": "0x252b1eea19d0e3407dc087b9c6cf90f6ee429489abe77531ac21de154160a576",
+    "rightBatchRoot": "0xf9bed12af4cc8b346fcded1522ea850ef0e78b0ec8b93ed52559f50e6952f6fd",
+    "registerTx": "0xfa075a95b0af4234a65fe64d3ee88b4c256cc7762f0631b8acd0c666d2213330",
+    "accepted": true,
+    "tamper": {
+      "flippedByte": 60000,
+      "reverted": true,
+      "reason": "MERKLE_ROOT"
+    },
+    "provedAt": "2026-11-04T10:25:52.480Z",
+    "replay": false,
+    "at": "2026-11-04T10:25:58.363Z",
+    "notBound": [
+      "batch root -> applicationRoot is registered by a trusted registrar (recomputed off chain, not by the contract)",
+      "signer set is inside the proof's digest; the contract never sees the public keys",
+      "one shared 32-byte message per child batch, not per-user ops; exactly two children",
+      "KoalaBear/Poseidon leanXMSS user keys from the TS SDK (src/sdk/leanxmss.ts), not our WOTS.sol accounts",
+      "security = the authors' 100-bit component targets; full-chain composition not analysed"
+    ],
+    "source": "sdk",
+    "sdk": {
+      "left": "out/validity/2026-11-04T10-24-53-871Z-2x256-n16-sdk/batch-left.json",
+      "right": "out/validity/2026-11-04T10-24-53-871Z-2x256-n16-sdk/batch-right.json",
+      "perChild": 16,
+      "logSlots": 4,
+      "slot": 3,
+      "keygenMsTotal": 92,
+      "signMsTotal": 1693,
+      "batchBytes": [
+        40469,
+        40469
+      ]
+    },
+    "leanvmProvingSeconds": 47.6,
+    "maxRssBytes": 5602885632,
+    "proofDir": "out/validity/2026-11-04T10-24-53-871Z-2x256-n16-sdk"
   }
 }
