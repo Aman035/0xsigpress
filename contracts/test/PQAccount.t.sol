@@ -174,13 +174,16 @@ contract PQAccountTest is Test {
         acct.executeDirect(next1, recipient, AMOUNT, "", sig);
     }
 
-    function test_executeDirect_bubblesTargetRevert() public {
+    /// SR-R3: a target revert no longer reverts the op; it is used up and the revert data is logged.
+    function test_executeDirect_targetRevertUsesOpUp() public {
         Reverter r = new Reverter();
         bytes memory data = abi.encodeCall(Reverter.boom, ());
         bytes memory sig = WOTSHelper.sign(seed, 0, acct.messageFor(next1, address(r), 0, data));
-        vm.expectRevert(Reverter.Nope.selector);
+        vm.expectEmit(true, false, false, true, address(acct));
+        emit PQAccount.ExecutionFailed(0, acct.pkHash(), address(r), abi.encodeWithSelector(Reverter.Nope.selector));
         acct.executeDirect(next1, address(r), 0, data, sig);
-        assertEq(acct.nonce(), 0);
+        assertEq(acct.nonce(), 1);
+        assertEq(acct.pkHash(), next1);
     }
 
     function test_batchThenDirect() public {

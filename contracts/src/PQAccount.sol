@@ -13,6 +13,7 @@ import {OptimisticAggregator} from "./OptimisticAggregator.sol";
 contract PQAccount {
     error NotAccepted();
     error InvalidSignature();
+    error InsufficientGas();
 
     event Executed(
         uint256 indexed nonce,
@@ -22,6 +23,8 @@ contract PQAccount {
         uint256 value,
         bool batched
     );
+    /// @notice The op was used up (key rotated, nonce bumped) but its call reverted with `reason`.
+    event ExecutionFailed(uint256 indexed nonce, bytes32 indexed pkHash, address target, bytes reason);
 
     OptimisticAggregator public immutable aggregator;
     bytes32 public pkHash;
@@ -79,6 +82,11 @@ contract PQAccount {
         return _execute(pk, nextPkHash, target, value, data, false);
     }
 
+    /// @dev Rotate the key, bump the nonce, run the call. A failing call does NOT revert: the op is used up and
+    ///      ExecutionFailed is logged, so a published signature can never be replayed later (SR-R3). Both entry
+    ///      points are permissionless and the signature is public, so a failure that looks like the caller ran
+    ///      the call out of gas (at most 1/63 of the pre-call gas left) reverts instead (SR-04); resubmit with
+    ///      more gas.
     function _execute(bytes32 pk, bytes32 nextPkHash, address target, uint256 value, bytes calldata data, bool batched)
         internal
         returns (bytes memory ret)
@@ -87,12 +95,12 @@ contract PQAccount {
         pkHash = nextPkHash;
         nonce = n + 1;
         emit Executed(n, pk, nextPkHash, target, value, batched);
+        uint256 g = gasleft();
         bool ok;
         (ok, ret) = target.call{value: value}(data);
         if (!ok) {
-            assembly ("memory-safe") {
-                revert(add(ret, 32), mload(ret))
-            }
+            if (gasleft() <= g / 63) revert InsufficientGas();
+            emit ExecutionFailed(n, pk, target, ret);
         }
     }
 }

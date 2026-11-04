@@ -18,6 +18,8 @@ contract FailedOpTest is Test {
     bytes32 seed = keccak256("failed-op");
     address thief = address(0x7E1F);
 
+    receive() external payable {}
+
     function setUp() public {
         agg = new OptimisticAggregator(0.01 ether, 120);
     }
@@ -87,7 +89,8 @@ contract FailedOpTest is Test {
         assertEq(acct.nonce(), 1);
         assertTrue(acct.isUsed(1));
         gate.setOpen();
-        vm.expectRevert(abi.encodeWithSelector(XMSSAccount.LeafUsed.selector, 1));
+        // the nonce moved, so the old signature no longer matches (and the leaf is marked used either way)
+        vm.expectRevert(XMSSAccount.InvalidSignature.selector);
         acct.executeDirect(1, leaves[1], address(gate), 0, hex"01", sig, path);
     }
 

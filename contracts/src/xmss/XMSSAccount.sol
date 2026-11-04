@@ -18,8 +18,11 @@ contract XMSSAccount {
     error InvalidSignature();
     error NotAccepted();
     error LeafUsed(uint256 leafIndex);
+    error InsufficientGas();
 
     event Executed(uint256 indexed nonce, uint256 indexed leafIndex, address target, uint256 value, bool batched);
+    /// @notice The op was used up (leaf marked used, nonce bumped) but its call reverted with `reason`.
+    event ExecutionFailed(uint256 indexed nonce, uint256 indexed leafIndex, address target, bytes reason);
 
     OptimisticAggregator public immutable aggregator;
     bytes32 public immutable root;
@@ -109,6 +112,10 @@ contract XMSSAccount {
         return _execute(leafIndex, target, value, data, true);
     }
 
+    /// @dev Mark the leaf used, bump the nonce, run the call. A failing call does NOT revert: the op is used up
+    ///      and ExecutionFailed is logged, so the published signature cannot be replayed later (SR-R3). A failure
+    ///      that looks like the caller under-funded the call (at most 1/63 of the pre-call gas left) reverts
+    ///      instead, so a third party cannot burn the op by picking the gas limit (SR-04).
     function _execute(uint256 leafIndex, address target, uint256 value, bytes calldata data, bool batched)
         internal
         returns (bytes memory ret)
@@ -121,12 +128,12 @@ contract XMSSAccount {
         uint256 n = nonce;
         nonce = n + 1;
         emit Executed(n, leafIndex, target, value, batched);
+        uint256 g = gasleft();
         bool ok;
         (ok, ret) = target.call{value: value}(data);
         if (!ok) {
-            assembly ("memory-safe") {
-                revert(add(ret, 32), mload(ret))
-            }
+            if (gasleft() <= g / 63) revert InsufficientGas();
+            emit ExecutionFailed(n, leafIndex, target, ret);
         }
     }
 }
