@@ -108,3 +108,63 @@ contract EntryGasTest is EntryFixture {
         return lo;
     }
 }
+
+/// @notice Gas-limit overhead of the OP_GAS_LIMIT cap (SR-02). Monad charges the gas LIMIT, so what matters is
+///         the smallest limit at which executeBundle succeeds versus the gas it actually uses. The cap's
+///         pre-call check needs OP_GAS_LIMIT + OP_GAS_LIMIT/63 + CALL_OVERHEAD (~243k) left before each op's
+///         call, which only binds on the LAST op: the overhead should be a one-time ~200-250k per bundle,
+///         independent of the op count.
+contract EntryGasOverheadTest is EntryFixture {
+    function setUp() public {
+        _deploy();
+    }
+
+    // One op count per test (a fresh EVM each, so 64 ops of WOTS signing fit in memory). The overhead is
+    // bounded by the same constant for every count: it does not grow with the number of ops.
+    uint256 constant MAX_OVERHEAD = 260_000;
+
+    function test_gasLimitOverhead_4ops() public {
+        assertLt(_overhead(4), MAX_OVERHEAD);
+    }
+
+    function test_gasLimitOverhead_32ops() public {
+        assertLt(_overhead(32), MAX_OVERHEAD);
+    }
+
+    function test_gasLimitOverhead_64ops() public {
+        assertLt(_overhead(64), MAX_OVERHEAD);
+    }
+
+    function _overhead(uint256 n) internal returns (uint256) {
+        uint32 base = uint32(seeds.length);
+        _createAccounts(n);
+        Op[] memory ops = new Op[](n);
+        for (uint32 i = 0; i < n; i++) {
+            ops[i] = _sign(base + i, recipient, AMOUNT, "");
+        }
+        uint256 id = _submitFinal(ops);
+        bytes memory cd = _bundle(id, ops);
+        uint256 snap = vm.snapshotState();
+        uint256 g0 = gasleft();
+        (bool ok,) = address(entry).call{gas: 29_000_000}(cd);
+        uint256 used = g0 - gasleft();
+        vm.revertToState(snap);
+        assertTrue(ok);
+        uint256 lo = 21_000;
+        uint256 hi = 29_000_000;
+        while (lo < hi) {
+            uint256 mid = (lo + hi) / 2;
+            uint256 s = vm.snapshotState();
+            (bool k,) = address(entry).call{gas: mid}(cd);
+            vm.revertToState(s);
+            if (k) hi = mid;
+            else lo = mid + 1;
+        }
+        emit log_named_uint(string.concat("ops ", vm.toString(n), ": gas used (inner call)"), used);
+        emit log_named_uint(string.concat("ops ", vm.toString(n), ": min gas limit (inner call)"), lo);
+        emit log_named_uint(string.concat("ops ", vm.toString(n), ": per-op used"), used / n);
+        emit log_named_uint(string.concat("ops ", vm.toString(n), ": limit - used (cap overhead)"), lo - used);
+        assertGt(lo - used, 200_000); // the last op's full OP_GAS_LIMIT must be available
+        return lo - used;
+    }
+}
