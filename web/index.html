@@ -63,7 +63,7 @@
   <header>
     <h1><span class="mark">Sig</span>press</h1>
     <span class="tag" id="chainTag">Monad testnet · chain —</span>
-    <span class="tag">optimistic aggregation · STARK next</span>
+    <span class="tag">optimistic aggregation · validity-proof prototype</span>
   </header>
 
   <p class="lede">Post-quantum signatures without losing Monad's block space. Switch to the PQ scheme
@@ -113,6 +113,24 @@
     </div>
   </div>
 
+  <!-- VALIDITY-PROOF LANE -->
+  <div class="card" style="margin-top:16px">
+    <h2>Sigpress <span style="color:var(--muted);font-weight:400;font-size:14px">(validity proof)</span></h2>
+    <div class="sub">Two batches of leanXMSS signatures → leanVM → one Keccak terminal STARK → verified by a Solidity verifier in one Monad tx. No challenge window.</div>
+    <dl class="kv">
+      <dt>signatures</dt><dd id="vSigs">—</dd>
+      <dt>gas charged</dt><dd id="vGas">—</dd>
+      <dt>calldata</dt><dd id="vBytes">—</dd>
+      <dt>terminal proof</dt><dd id="vProof">—</dd>
+      <dt>proving (off chain)</dt><dd id="vProve">—</dd>
+      <dt>tampered proof</dt><dd id="vTamper">—</dd>
+      <dt>verifier · gate</dt><dd id="vAddrs">—</dd>
+      <dt>tx</dt><dd id="vTx">—</dd>
+    </dl>
+    <div style="margin-top:12px"><span class="badge measured" id="vBadge">measured on Monad testnet</span></div>
+    <div class="txline" style="margin-top:10px">Research prototype. Not yet bound on chain: the batch root → proof root link is set by a trusted registrar; the contract never sees the signer keys; every signer in a batch signs the same 32-byte root (not per-user ops); test keys; 100-bit component security targets, full-chain composition not analysed.</div>
+  </div>
+
   <!-- SCOREBOARD -->
   <h3 class="section">Scoreboard</h3>
   <div class="scoreboard">
@@ -146,10 +164,11 @@
   </div>
 
   <section class="note">
-    <b style="color:var(--ink)">Honest limits.</b> This is <b style="color:var(--ink)">optimistic</b> aggregation,
+    <b style="color:var(--ink)">Honest limits.</b> The main lane is <b style="color:var(--ink)">optimistic</b> aggregation,
     not a validity proof: there is a challenge window and the aggregator serves signature data. It is still
     post-quantum end to end (real WOTS signatures, checked on chain in a challenge) and lives on Monad testnet.
-    The one-hash-based-STARK-over-N-signatures version is the product (kill tests K3–K6).
+    The one-hash-based-STARK-over-N-signatures version is the product; the validity-proof panel above is its
+    working research prototype (K10), with the binding gaps listed there.
     Every number here is either measured on testnet (with a tx hash) or labelled a capacity model.
     &nbsp;·&nbsp; <a href="https://github.com/Aman035/sigpress">Repo</a> ·
     <a href="https://github.com/Aman035/sigpress/blob/main/docs/pitch.md">Pitch</a> ·
@@ -226,6 +245,22 @@ function addrLink(explorer, label, addr) {
   document.getElementById("sbBatch").textContent = fmt(res.batch?.gasUsed);
   document.getElementById("sbExec").textContent = fmt(res.execute?.gasPerExecute);
   document.getElementById("sbChal").textContent = res.tamper?.slashed ? "slashed ✓" : "—";
+
+  // Validity proof (results.validity from `pnpm validity` or `VALIDITY=1 pnpm stage`)
+  const v = res.validity;
+  if (v && v.txHash) {
+    document.getElementById("vSigs").textContent = fmt(v.signatures) + (v.perChild ? ` (2 × ${fmt(v.perChild)})` : "");
+    document.getElementById("vGas").textContent = fmt(v.gasCharged) + (v.signatures ? ` · ${fmt(Math.round(v.gasCharged / v.signatures))} / sig` : "");
+    document.getElementById("vBytes").textContent = fmt(v.calldataBytes) + " B" + (v.signatures ? ` · ${(v.calldataBytes / v.signatures).toFixed(1)} B / sig` : "");
+    document.getElementById("vProof").textContent = v.proofBytes ? fmt(v.proofBytes) + " B (native)" : "—";
+    document.getElementById("vProve").textContent = v.proveSeconds ? v.proveSeconds + " s wall, 16 GB M4 (single run)" : "—";
+    document.getElementById("vTamper").innerHTML = v.tamper?.reverted
+      ? `<span class="pill slash">reverts ${String(v.tamper.reason || "").replace(/[<>&]/g, "")}</span> (eth_call, 1 bit flipped)` : "—";
+    document.getElementById("vAddrs").innerHTML = [addrLink(ex, "", v.verifier), addrLink(ex, "", v.gate)].filter(Boolean).join(" · ") || "—";
+    document.getElementById("vTx").innerHTML = txLink(ex, v.txHash);
+  } else {
+    document.getElementById("vBadge").textContent = "no run yet (pnpm validity)";
+  }
 
   // Tamper
   document.getElementById("tSubmit").innerHTML = txLink(ex, res.tamper?.submitTx);
