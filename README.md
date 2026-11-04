@@ -79,18 +79,37 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 
 ## Try it
 
-**Live demo page: https://aman035.github.io/sigpress/**
+**Live demo page (animated run, shareable): https://aman035.github.io/sigpress/**
+
+### Interactive wallet — send a real post-quantum transfer on Monad testnet
+
+A browser wallet that sends real transfers through the aggregator service to Monad, showing every phase
+(the one-time key, the signed message, the 2,144-byte signature, the batch root, and every tx). Needs a
+funded key in the root `.env` (`PRIVATE_KEY_K13`).
 
 ```sh
-# Demo page locally (two capacity lanes + scoreboard + live explorer links)
-cd web && python3 -m http.server 8080   # then open http://localhost:8080
+cd aggregator
+pnpm install                                 # first time only
 
-# Contracts & aggregator
-cd contracts && forge test
-cd aggregator && pnpm install && pnpm test
+# terminal 1 — the aggregator service (batches and submits to Monad)
+KEY_VAR=PRIVATE_KEY_K13 pnpm service          # http://127.0.0.1:8547
 
-# One-shot testnet deploy + demo (needs a funded PRIVATE_KEY in .env)
-./scripts/testnet.sh
+# terminal 2 — the wallet (serves the UI, signs, relays)
+KEY_VAR=PRIVATE_KEY_K13 pnpm wallet           # open http://127.0.0.1:8550
+```
+
+Open **http://127.0.0.1:8550**, pick a post-quantum account, and send. Watch it go signed → queued →
+batched on Monad → finalized → executed, with live explorer links; "Forge a bad op" shows the aggregator
+reject a tampered signature. Full guide and env in [`docs/wallet-demo.md`](docs/wallet-demo.md). For the
+on-chain slash of a withheld/dishonest batch, also run `KEY_VAR=PRIVATE_KEY_K13 DA_URL=http://127.0.0.1:8547 pnpm watchtower`
+and `KEY_VAR=PRIVATE_KEY_K13 pnpm service:tamper`.
+
+### Tests and the one-shot CLI demo
+
+```sh
+cd contracts && forge test                    # 93 Solidity tests
+cd aggregator && pnpm install && pnpm test    # TS tests
+./scripts/testnet.sh                          # one-shot: deploy + batch + tamper on testnet
 ```
 
 ---
