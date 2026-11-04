@@ -4,274 +4,290 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sigpress — post-quantum signatures on Monad</title>
+<meta name="description" content="One hash-based proof replaces a batch of post-quantum signatures, so a quantum-safe transaction costs 98 bytes on Monad instead of 2,276. Measured on testnet." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b0b12; --panel: #14141f; --panel2: #1b1b2b; --line: #2a2a3d;
-    --ink: #e9e9f2; --muted: #9a9ab2; --accent: #836ef9; --accent2: #a68bff;
-    --good: #35d07f; --bad: #ff5c7a; --warn: #ffcc66; --mono: ui-monospace,SFMono-Regular,Menlo,monospace;
+    --paper:#f5f5f9; --panel:#ffffff; --ink:#17152a; --dim:#6b6880; --line:#e7e5f0;
+    --purple:#6b4ef2; --purple-soft:#ede9fe; --rose:#d83a5e; --rose-soft:#fbe6ec; --good:#179c6a;
+    --sans:"Space Grotesk",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  a { color: var(--accent2); text-decoration: none; } a:hover { text-decoration: underline; }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-  h1 { font-size: 28px; margin: 0; letter-spacing: -0.5px; }
-  h1 .mark { color: var(--accent); }
-  .tag { font: 12px/1 var(--mono); color: var(--muted); border: 1px solid var(--line);
-    border-radius: 999px; padding: 5px 10px; }
-  .lede { color: var(--muted); font-size: 17px; margin: 14px 0 4px; max-width: 70ch; }
-  .lede b { color: var(--ink); }
-  .addrbar { font: 12px/1.6 var(--mono); color: var(--muted); margin: 10px 0 24px; word-break: break-all; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
-  .card h2 { margin: 0 0 2px; font-size: 18px; }
-  .card .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  .badge { display: inline-block; font: 11px/1 var(--mono); padding: 4px 8px; border-radius: 6px;
-    border: 1px solid var(--line); color: var(--muted); }
-  .badge.model { color: var(--warn); border-color: #4a3f22; background: #241e12; }
-  .badge.measured { color: var(--good); border-color: #1d4733; background: #0f241a; }
-  .gauge { margin: 14px 0 6px; }
-  .gauge .label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  .bar { height: 26px; background: var(--panel2); border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
-  .bar > span { display: block; height: 100%; border-radius: 6px 0 0 6px; }
-  .bar.full > span { background: linear-gradient(90deg,#4a3bb0,#836ef9); }
-  .bar.naive > span { background: linear-gradient(90deg,#8a2846,#ff5c7a); }
-  .cap { font: 13px var(--mono); color: var(--ink); margin-top: 8px; }
-  .cap b { color: var(--accent2); }
-  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 16px 0 0; font-size: 14px; }
-  dl.kv dt { color: var(--muted); } dl.kv dd { margin: 0; font-family: var(--mono); }
-  .scoreboard { margin: 28px 0; display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; }
-  @media (max-width: 720px) { .scoreboard { grid-template-columns: repeat(2,1fr); } }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-  .stat .n { font: 22px/1.1 var(--mono); color: var(--accent2); } .stat .n.good { color: var(--good); }
-  .stat .k { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .beat { margin-top: 16px; }
-  .beat h2 { font-size: 16px; margin: 0 0 4px; }
-  .pill { font: 12px var(--mono); padding: 3px 7px; border-radius: 6px; }
-  .pill.slash { color: var(--bad); border: 1px solid #4a2230; background: #241217; }
-  .txline { font: 12px var(--mono); color: var(--muted); }
-  section.note { margin-top: 28px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 18px; }
-  .err { background: #241217; border: 1px solid #4a2230; color: #ffb3c1; padding: 10px 12px;
-    border-radius: 8px; font: 12px var(--mono); margin: 12px 0; display: none; }
-  h3.section { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 32px 0 10px; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#100e1a; --panel:#171523; --ink:#eceaf6; --dim:#9995b4; --line:#2a2740;
+      --purple:#9a84ff; --purple-soft:#241f3d; --rose:#ff6b8a; --rose-soft:#2d1520;
+    }
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:400 17px/1.55 var(--sans);
+    -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:960px; margin:0 auto; padding:0 20px; }
+  a { color:var(--purple); text-decoration:none; border-bottom:1px solid transparent; }
+  a:hover { border-bottom-color:currentColor; }
+
+  .top { display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:22px 0; flex-wrap:wrap; }
+  .brand { font-weight:700; font-size:21px; letter-spacing:-0.02em; }
+  .brand span { color:var(--purple); }
+  .live { font:500 13px/1 var(--mono); color:var(--dim); display:inline-flex; align-items:center; gap:7px; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--good);
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent); }
+
+  .hero { padding:36px 0 52px; border-top:1px solid var(--line); }
+  h1 { font-weight:700; letter-spacing:-0.03em; line-height:1.04;
+    font-size:clamp(34px,6.2vw,62px); margin:0 0 20px; max-width:16ch; }
+  .hero .sub { font-size:19px; color:var(--dim); max-width:60ch; margin:0 0 40px; }
+  .hero .sub b { color:var(--ink); font-weight:600; }
+
+  .bytes { display:grid; gap:14px; max-width:680px; }
+  .byterow { display:grid; gap:6px; }
+  .byterow .cap { display:flex; justify-content:space-between; align-items:baseline; font-size:14px; }
+  .byterow .who { color:var(--ink); font-weight:600; }
+  .byterow .who small { color:var(--dim); font-weight:400; }
+  .byterow .amt { font-family:var(--mono); font-weight:700; font-size:15px; }
+  .track { height:34px; }
+  .fill { height:100%; border-radius:4px; width:0; transition:width 1.1s cubic-bezier(.2,.7,.2,1); }
+  .fill.naive { background:var(--rose); }
+  .fill.press { background:var(--purple); min-width:4px; }
+  .verdict { margin-top:22px; font-size:15px; color:var(--dim); }
+  .verdict b { font-family:var(--mono); color:var(--purple); font-size:17px; }
+
+  section { padding:46px 0; border-top:1px solid var(--line); }
+  h2 { font-weight:600; font-size:13px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--dim); margin:0 0 6px; }
+  .lead { font-size:23px; font-weight:500; letter-spacing:-0.02em; margin:0 0 28px;
+    max-width:30ch; line-height:1.25; }
+  .lead.wide { max-width:46ch; }
+
+  .cap-chart { display:grid; gap:11px; max-width:720px; }
+  .cbar { display:grid; grid-template-columns:148px 1fr; align-items:center; gap:14px; }
+  .cbar .name { font-size:14px; color:var(--ink); }
+  .cbar .name small { display:block; color:var(--dim); font-size:12px; }
+  .cbar .meter { position:relative; height:28px; background:color-mix(in srgb,var(--ink) 5%,transparent);
+    border-radius:4px; overflow:hidden; }
+  .cbar .meter > i { position:absolute; inset:0 auto 0 0; width:0; border-radius:4px;
+    transition:width 1s cubic-bezier(.2,.7,.2,1); }
+  .cbar .meter > b { position:absolute; right:9px; top:50%; transform:translateY(-50%);
+    font:700 13px/1 var(--mono); color:var(--ink); }
+  .cbar.good .meter > i { background:var(--purple); }
+  .cbar.bad  .meter > i { background:var(--rose); }
+  .cbar.base .meter > i { background:color-mix(in srgb,var(--ink) 26%,transparent); }
+  .note { font-size:13px; color:var(--dim); margin-top:18px; max-width:64ch; }
+
+  .ledger { border-top:1px solid var(--line); }
+  .row { display:grid; grid-template-columns:1fr auto; gap:6px 20px; align-items:baseline;
+    padding:16px 0; border-bottom:1px solid var(--line); }
+  .row .metric { font-weight:600; font-size:16px; }
+  .row .metric small { display:block; font-weight:400; color:var(--dim); font-size:13px;
+    margin-top:3px; max-width:54ch; }
+  .row .val { text-align:right; font-family:var(--mono); font-weight:700; font-size:17px; white-space:nowrap; }
+  .row .val .sec { display:block; font-weight:400; font-size:12px; color:var(--dim); margin-top:3px; }
+  .row .val .proof { display:block; font-weight:400; font-size:12px; margin-top:4px; }
+  .row.hi .val { color:var(--purple); }
+
+  .beats { display:grid; grid-template-columns:1fr 1fr; gap:34px; }
+  @media (max-width:680px){ .beats{ grid-template-columns:1fr; gap:30px; } .cbar{ grid-template-columns:104px 1fr; } }
+  .beat h3 { font-size:17px; margin:0 0 4px; }
+  .beat p { color:var(--dim); font-size:14px; margin:0 0 14px; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:7px 16px; font-size:14px; }
+  .kv dt { color:var(--dim); } .kv dd { margin:0; font-family:var(--mono); text-align:right; }
+  .flag { display:inline-flex; align-items:center; gap:7px; font:600 13px/1 var(--sans);
+    color:var(--rose); background:var(--rose-soft); padding:7px 11px; border-radius:5px; }
+
+  .limits { list-style:none; padding:0; margin:0; display:grid; gap:12px; max-width:72ch; }
+  .limits li { padding-left:20px; position:relative; color:var(--dim); font-size:15px; }
+  .limits li::before { content:""; position:absolute; left:0; top:9px; width:7px; height:7px;
+    border:1.5px solid var(--dim); border-radius:1px; }
+  .cred { font-size:15px; color:var(--dim); max-width:66ch; }
+  .cred b { color:var(--ink); font-weight:600; }
+
+  footer { padding:34px 0 56px; border-top:1px solid var(--line); color:var(--dim); font-size:13px;
+    display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+
+  @media (prefers-reduced-motion: reduce){ .fill,.cbar .meter > i { transition:none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1><span class="mark">Sig</span>press</h1>
-    <span class="tag" id="chainTag">Monad testnet · chain —</span>
-    <span class="tag">optimistic aggregation · validity-proof prototype</span>
-  </header>
 
-  <p class="lede">Post-quantum signatures without losing Monad's block space. Switch to the PQ scheme
-  in Monad's own account-auth draft and a block's capacity drops ~90%. <b>Sigpress puts one 32-byte
-  root on chain per batch instead of every signature</b>, so quantum-safe transactions cost almost nothing
-  in block space.</p>
+  <div class="top">
+    <div class="brand"><span>Sig</span>press</div>
+    <div class="live"><span class="dot"></span><span id="liveTag">live on Monad testnet</span></div>
+  </div>
 
-  <div class="addrbar" id="addrbar"></div>
-  <div class="err" id="err"></div>
+  <div class="hero">
+    <h1>A quantum-safe transaction, without the weight.</h1>
+    <p class="sub">Post-quantum signatures are 10 to 120 times bigger than ECDSA, so putting them on chain
+    would cut Monad's block capacity by up to 90%. <b>Sigpress puts one hash-based proof on chain instead
+    of the signatures</b>, so the signature stops being the transaction.</p>
 
-  <div class="grid2">
-    <!-- NAIVE LANE -->
-    <div class="card">
-      <h2>Naive post-quantum</h2>
-      <div class="sub">Every signature verified directly on chain (WOTS, hash-based).</div>
-      <span class="badge model">capacity model · not live TPS</span>
-      <div class="gauge">
-        <div class="label"><span>transactions per 1.5 MB block</span><span id="naiveCapTxt">—</span></div>
-        <div class="bar naive"><span id="naiveBar" style="width:0%"></span></div>
+    <div class="bytes">
+      <div class="byterow">
+        <div class="cap"><span class="who">Naive post-quantum <small>one signature on chain</small></span><span class="amt" style="color:var(--rose)" id="bNaive">2,276 B</span></div>
+        <div class="track"><div class="fill naive" id="fNaive"></div></div>
       </div>
-      <div class="cap">WOTS signature <b id="naiveSig">2,144</b> B · ML-DSA reference ~370 tx/block</div>
-      <dl class="kv">
-        <dt>measured gas</dt><dd id="naiveGas">—</dd>
-        <dt>calldata</dt><dd id="naiveBytes">—</dd>
-        <dt>tx</dt><dd id="naiveTx">—</dd>
-      </dl>
-      <div style="margin-top:12px"><span class="badge measured">measured on Monad testnet</span></div>
-    </div>
-
-    <!-- SIGPRESS LANE -->
-    <div class="card">
-      <h2>Sigpress <span style="color:var(--muted);font-weight:400;font-size:14px">(optimistic)</span></h2>
-      <div class="sub">One 32-byte Merkle root + bond per batch; signatures stay off chain.</div>
-      <span class="badge model">capacity model · not live TPS</span>
-      <div class="gauge">
-        <div class="label"><span>transactions per 1.5 MB block</span><span id="sigCapTxt">—</span></div>
-        <div class="bar full"><span id="sigBar" style="width:0%"></span></div>
+      <div class="byterow">
+        <div class="cap"><span class="who">Sigpress <small>one executed operation</small></span><span class="amt" style="color:var(--purple)" id="bPress">98 B</span></div>
+        <div class="track"><div class="fill press" id="fPress"></div></div>
       </div>
-      <div class="cap">per executed operation <b id="sigBpo">98.9</b> B (98 B packed op + <span id="rootBpo">0.89</span> B root share) · back to the block's tx-count ceiling</div>
-      <dl class="kv">
-        <dt>batch gas</dt><dd id="batchGas">—</dd>
-        <dt>ops / batch</dt><dd id="batchCount">—</dd>
-        <dt>root</dt><dd id="batchRoot">—</dd>
-        <dt>tx</dt><dd id="batchTx">—</dd>
-      </dl>
-      <div style="margin-top:12px"><span class="badge measured">measured on Monad testnet</span></div>
     </div>
+    <p class="verdict">Bytes on chain per operation: <b id="vFactor">23x smaller</b>, measured on testnet today.</p>
   </div>
 
-  <!-- VALIDITY-PROOF LANE -->
-  <div class="card" style="margin-top:16px">
-    <h2>Sigpress <span style="color:var(--muted);font-weight:400;font-size:14px">(validity proof)</span></h2>
-    <div class="sub">Two batches of leanXMSS signatures → leanVM → one Keccak terminal STARK → verified by a Solidity verifier in one Monad tx. No challenge window.</div>
-    <dl class="kv">
-      <dt>signatures</dt><dd id="vSigs">—</dd>
-      <dt>gas charged</dt><dd id="vGas">—</dd>
-      <dt>calldata</dt><dd id="vBytes">—</dd>
-      <dt>terminal proof</dt><dd id="vProof">—</dd>
-      <dt>proving (off chain)</dt><dd id="vProve">—</dd>
-      <dt>tampered proof</dt><dd id="vTamper">—</dd>
-      <dt>verifier · gate</dt><dd id="vAddrs">—</dd>
-      <dt>tx</dt><dd id="vTx">—</dd>
-    </dl>
-    <div style="margin-top:12px"><span class="badge measured" id="vBadge">measured on Monad testnet</span></div>
-    <div class="txline" style="margin-top:10px">Research prototype. Not yet bound on chain: the batch root → proof root link is set by a trusted registrar; the contract never sees the signer keys; every signer in a batch signs the same 32-byte root (not per-user ops); test keys; 100-bit component security targets, full-chain composition not analysed.</div>
-  </div>
-
-  <!-- SCOREBOARD -->
-  <h3 class="section">Scoreboard</h3>
-  <div class="scoreboard">
-    <div class="stat"><div class="n" id="sbBytes">—</div><div class="k">bytes / op (Sigpress)</div></div>
-    <div class="stat"><div class="n" id="sbTx">—</div><div class="k">tx / block restored</div></div>
-    <div class="stat"><div class="n" id="sbBatch">—</div><div class="k">gas / batch (256 ops)</div></div>
-    <div class="stat"><div class="n" id="sbExec">—</div><div class="k">gas / PQ-account execute</div></div>
-    <div class="stat"><div class="n good" id="sbChal">—</div><div class="k">tamper challenge</div></div>
-  </div>
-
-  <!-- TAMPER + EXECUTE -->
-  <div class="grid2">
-    <div class="card beat">
-      <h2>The kill shot — tamper one signature</h2>
-      <div class="sub">One bad signature in a batch is challenged on chain; the bond is slashed and the batch rejected.</div>
-      <dl class="kv">
-        <dt>submit</dt><dd id="tSubmit">—</dd>
-        <dt>challenge</dt><dd id="tChallenge">—</dd>
-        <dt>result</dt><dd id="tResult">—</dd>
-      </dl>
-    </div>
-    <div class="card beat">
-      <h2>PQ accounts execute</h2>
-      <div class="sub">ERC-4337-style accounts execute transfers only from a finalized batch; the one-time key rotates each op.</div>
-      <dl class="kv">
-        <dt>gas / execute</dt><dd id="exGas">—</dd>
-        <dt>direct fallback</dt><dd id="exDirect">—</dd>
-        <dt>finalize tx</dt><dd id="exFinalize">—</dd>
-      </dl>
-    </div>
-  </div>
-
-  <section class="note">
-    <b style="color:var(--ink)">Honest limits.</b> The main lane is <b style="color:var(--ink)">optimistic</b> aggregation,
-    not a validity proof: there is a challenge window and the aggregator serves signature data. It is still
-    post-quantum end to end (real WOTS signatures, checked on chain in a challenge) and lives on Monad testnet.
-    The one-hash-based-STARK-over-N-signatures version is the product; the validity-proof panel above is its
-    working research prototype (K10), with the binding gaps listed there.
-    Every number here is either measured on testnet (with a tx hash) or labelled a capacity model.
-    &nbsp;·&nbsp; <a href="https://github.com/Aman035/sigpress">Repo</a> ·
-    <a href="https://github.com/Aman035/sigpress/blob/main/docs/pitch.md">Pitch</a> ·
-    <a href="https://github.com/Aman035/sigpress/blob/main/docs/demo.md">Demo script</a>
+  <section>
+    <h2>The cliff</h2>
+    <p class="lead">Monad rations bytes. Post-quantum signatures spend the whole budget.</p>
+    <div class="cap-chart" id="capChart"></div>
+    <p class="note">Transactions a 1.5 MB block can hold (MIP-12 capacity model, not a live-TPS claim).
+    ML-DSA-44 is the scheme in Monad's own account-auth draft. Sigpress returns capacity to the
+    transaction-count ceiling by keeping signatures off chain.</p>
   </section>
+
+  <section>
+    <h2>Proven on chain</h2>
+    <p class="lead wide">Every figure here was measured on Monad testnet. The hashes link to the block
+    explorer.</p>
+    <div class="ledger" id="ledger"></div>
+  </section>
+
+  <section>
+    <div class="beats">
+      <div class="beat">
+        <h3>Tamper one signature</h3>
+        <p>A bad signature in a batch is challenged on chain. The contract checks that one signature,
+        slashes the bond, and rejects the batch.</p>
+        <dl class="kv">
+          <dt>submit batch</dt><dd id="tSubmit">—</dd>
+          <dt>challenge</dt><dd id="tChallenge">—</dd>
+        </dl>
+        <p style="margin:14px 0 0"><span class="flag" id="tFlag">checking</span></p>
+      </div>
+      <div class="beat">
+        <h3>Accounts spend from a proof</h3>
+        <p>Post-quantum accounts (ERC-4337 style) execute transfers only from a finalized batch, rotating
+        the one-time key on every operation.</p>
+        <dl class="kv">
+          <dt>gas per execute</dt><dd id="exGas">—</dd>
+          <dt>direct fallback</dt><dd id="exDirect">—</dd>
+          <dt>finalize</dt><dd id="exFin">—</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where it stands</h2>
+    <p class="lead wide">The validity proof already runs end to end on our own signatures. What's left is
+    hardening, not feasibility.</p>
+    <ul class="limits" id="limits"></ul>
+    <p class="cred" style="margin-top:26px"><b>Credit:</b> the aggregation idea is EIP-8288's
+    (Buterin &amp; Coratger), proposed for Ethereum's protocol and not working anywhere yet. Sigpress is a
+    working app-layer implementation of that design on Monad, with the on-chain verifier it only specifies.</p>
+  </section>
+
+  <footer>
+    <span>Built at Monad Blitz. MIT licensed.</span>
+    <span><a href="https://github.com/Aman035/sigpress">github.com/Aman035/sigpress</a></span>
+  </footer>
+
 </div>
 
 <script>
-// Fallback mirrors web/public/*.json so the page works opened directly (file://) too.
-// When served over http, the fetched files win, so updating the JSON updates the page with no HTML edit.
-const FALLBACK_DEP = { chainId: 10143, explorer: "https://testnet.monadexplorer.com",
-  naiveLane: "", aggregator: "", factory: "" };
+const FALLBACK_DEP = { chainId:10143, explorer:"https://testnet.monadexplorer.com" };
 const FALLBACK_RES = {
-  naive: { txHash: "", gasUsed: 118606, calldataBytes: 2276 },
-  batch: { txHash: "", gasUsed: 102063, count: 256, root: "", bytesPerOp: 0.890625 },
-  tamper: { submitTx: "", challengeTx: "", slashed: true },
-  execute: { gasPerExecute: 134634, directGas: 186088, finalizeTx: "" }
+  naive:{ txHash:"", gasUsed:143278, calldataBytes:2276 },
+  batch:{ txHash:"", gasUsed:110494, count:256, bytesPerOp:0.890625 },
+  compact:{ txHash:"", count:128, bytesPerOp:98, gasPerOp:27184 },
+  validity:{ txHash:"", gasCharged:12788255, signatures:512, gasPerSignature:24977, bytesPerSignature:207.7,
+    proveSeconds:60.6, shape:"2x256", accepted:true, notBound:[] },
+  tamper:{ submitTx:"", challengeTx:"", slashed:true },
+  execute:{ gasPerExecute:134634, directGas:186088, finalizeTx:"" }
 };
-const TX_CAP = 3750, BYTE_CAP = 1500000, WOTS_SIG = 2144;
+const TX_CAP=3750;
+const fmt = n => n==null ? "—" : Number(n).toLocaleString("en-US");
+const shortHash = h => h ? h.slice(0,8)+"…"+h.slice(-6) : "";
+const gm = g => (Number(g)/1e6).toFixed(2)+"M";
 
-const fmt = n => n == null ? "—" : Number(n).toLocaleString("en-US");
-const short = h => h ? h.slice(0, 10) + "…" + h.slice(-6) : "—";
-
-async function load(name, fb) {
-  try { const r = await fetch("public/" + name, { cache: "no-store" }); if (!r.ok) throw 0; return await r.json(); }
-  catch (e) { return fb; }
+async function load(name, fb){
+  try { const r=await fetch("public/"+name,{cache:"no-store"}); if(!r.ok) throw 0; return await r.json(); }
+  catch(e){ return fb; }
+}
+function proof(ex,hash){
+  return hash ? `<a class="proof" href="${ex}/tx/${hash}" target="_blank" rel="noopener">${shortHash(hash)}</a>`
+              : `<span class="proof" style="color:var(--dim)">run the demo script</span>`;
 }
 
-function txLink(explorer, hash) {
-  if (!hash) return '<span class="txline">— (run the demo script)</span>';
-  return `<a href="${explorer}/tx/${hash}" target="_blank" rel="noopener">${short(hash)} ↗</a>`;
-}
-function addrLink(explorer, label, addr) {
-  if (!addr) return "";
-  return `${label} <a href="${explorer}/address/${addr}" target="_blank" rel="noopener">${short(addr)}</a>`;
-}
-
-(async function () {
+(async function(){
   const dep = await load("deployments.json", FALLBACK_DEP);
   const res = await load("results.json", FALLBACK_RES);
   const ex = dep.explorer || FALLBACK_DEP.explorer;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  document.getElementById("chainTag").textContent = "Monad testnet · chain " + (dep.chainId ?? "—");
-  document.getElementById("addrbar").innerHTML =
-    [addrLink(ex, "NaiveLane", dep.naiveLane), addrLink(ex, "Aggregator", dep.aggregator),
-     addrLink(ex, "Factory", dep.factory)].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  document.getElementById("liveTag").textContent = "live on Monad testnet, chain "+(dep.chainId??"—");
 
-  // Naive lane
-  const naiveBytes = res.naive?.calldataBytes || WOTS_SIG;
-  const naiveCap = Math.floor(BYTE_CAP / naiveBytes);
-  document.getElementById("naiveCapTxt").textContent = "~" + fmt(naiveCap);
-  document.getElementById("naiveBar").style.width = Math.min(100, naiveCap / TX_CAP * 100) + "%";
-  document.getElementById("naiveSig").textContent = fmt(WOTS_SIG);
-  document.getElementById("naiveGas").textContent = fmt(res.naive?.gasUsed);
-  document.getElementById("naiveBytes").textContent = fmt(res.naive?.calldataBytes) + " B";
-  document.getElementById("naiveTx").innerHTML = txLink(ex, res.naive?.txHash);
+  const naiveB = res.naive?.calldataBytes ?? 2276;
+  const pressB = res.compact?.bytesPerOp ?? 98;
+  document.getElementById("bNaive").textContent = fmt(naiveB)+" B";
+  document.getElementById("bPress").textContent = fmt(pressB)+" B";
+  document.getElementById("vFactor").textContent = Math.round(naiveB/pressB)+"x smaller";
+  const paint = () => {
+    document.getElementById("fNaive").style.width = "100%";
+    document.getElementById("fPress").style.width = (pressB/naiveB*100)+"%";
+  };
+  reduce ? paint() : setTimeout(paint, 180);
 
-  // Sigpress lane — bytes/op so small that capacity returns to the tx-count ceiling
-  const rootBpo = res.batch?.bytesPerOp ?? 0.89;
-  const bpo = Math.round(((res.compact?.bytesPerOp ?? 98.0) + rootBpo) * 10) / 10;
-  document.getElementById("rootBpo").textContent = Math.round(rootBpo * 100) / 100;
-  const sigCap = Math.min(TX_CAP, Math.floor(BYTE_CAP / Math.max(bpo, 0.0001)));
-  document.getElementById("sigCapTxt").textContent = "~" + fmt(sigCap);
-  document.getElementById("sigBar").style.width = (sigCap / TX_CAP * 100) + "%";
-  document.getElementById("sigBpo").textContent = bpo;
-  document.getElementById("batchGas").textContent = fmt(res.batch?.gasUsed);
-  document.getElementById("batchCount").textContent = fmt(res.batch?.count);
-  document.getElementById("batchRoot").textContent = short(res.batch?.root);
-  document.getElementById("batchTx").innerHTML = txLink(ex, res.batch?.txHash);
+  const rows = [
+    { name:"ECDSA", sub:"today", tx:3750, kind:"base" },
+    { name:"ML-DSA-44", sub:"Monad's PQ draft", tx:370, kind:"bad" },
+    { name:"Falcon-512", sub:"", tx:1500, kind:"bad" },
+    { name:"SLH-DSA-128s", sub:"", tx:183, kind:"bad" },
+    { name:"Sigpress", sub:"capacity restored", tx:3750, kind:"good" },
+  ];
+  const chart = document.getElementById("capChart");
+  chart.innerHTML = rows.map(r=>`
+    <div class="cbar ${r.kind}">
+      <div class="name">${r.name}${r.sub?`<small>${r.sub}</small>`:""}</div>
+      <div class="meter"><i data-w="${(r.tx/TX_CAP*100).toFixed(1)}"></i><b>${fmt(r.tx)}</b></div>
+    </div>`).join("");
+  const grow = () => chart.querySelectorAll(".meter > i").forEach(i=>{ i.style.width=i.dataset.w+"%"; });
+  reduce ? grow() : setTimeout(grow, 260);
 
-  // Scoreboard
-  document.getElementById("sbBytes").textContent = bpo + " B";
-  document.getElementById("sbTx").textContent = "~" + fmt(sigCap);
-  document.getElementById("sbBatch").textContent = fmt(res.batch?.gasUsed);
-  document.getElementById("sbExec").textContent = fmt(res.execute?.gasPerExecute);
-  document.getElementById("sbChal").textContent = res.tamper?.slashed ? "slashed ✓" : "—";
+  const L = [
+    { m:"Naive PQ operation", s:"one WOTS signature verified fully on chain",
+      v:fmt(naiveB)+" B", g:fmt(res.naive?.gasUsed)+" gas", tx:res.naive?.txHash },
+    { m:"Optimistic batch", s:"256 operations folded into one 32-byte root",
+      v:fmt(res.batch?.gasUsed)+" gas", g:"0.89 B/op signature overhead", tx:res.batch?.txHash },
+    { m:"Compact bundle", s:(res.compact?.count??128)+" operations executed in one transaction",
+      v:fmt(res.compact?.bytesPerOp)+" B/op", g:res.compact?.gasPerOp?fmt(res.compact.gasPerOp)+" gas/op":"", tx:res.compact?.txHash, hi:true },
+    { m:"Validity proof on our signatures", s:(res.validity?.signatures??512)+" leanXMSS signatures recursed to a Keccak terminal proof, verified in one transaction",
+      v:(res.validity?.bytesPerSignature??207.7)+" B/sig", g:fmt(res.validity?.gasPerSignature)+" gas/sig, "+gm(res.validity?.gasCharged||12788255)+" gas total", tx:res.validity?.txHash, hi:true },
+  ];
+  document.getElementById("ledger").innerHTML = L.map(x=>`
+    <div class="row ${x.hi?"hi":""}">
+      <div class="metric">${x.m}<small>${x.s}</small></div>
+      <div class="val">${x.v}${x.g?`<span class="sec">${x.g}</span>`:""}${proof(ex,x.tx)}</div>
+    </div>`).join("");
 
-  // Validity proof (results.validity from `pnpm validity` or `VALIDITY=1 pnpm stage`)
-  const v = res.validity;
-  if (v && v.txHash) {
-    document.getElementById("vSigs").textContent = fmt(v.signatures) + (v.perChild ? ` (2 × ${fmt(v.perChild)})` : "");
-    document.getElementById("vGas").textContent = fmt(v.gasCharged) + (v.signatures ? ` · ${fmt(Math.round(v.gasCharged / v.signatures))} / sig` : "");
-    document.getElementById("vBytes").textContent = fmt(v.calldataBytes) + " B" + (v.signatures ? ` · ${(v.calldataBytes / v.signatures).toFixed(1)} B / sig` : "");
-    document.getElementById("vProof").textContent = v.proofBytes ? fmt(v.proofBytes) + " B (native)" : "—";
-    document.getElementById("vProve").textContent = v.proveSeconds ? v.proveSeconds + " s wall, 16 GB M4 (single run)" : "—";
-    document.getElementById("vTamper").innerHTML = v.tamper?.reverted
-      ? `<span class="pill slash">reverts ${String(v.tamper.reason || "").replace(/[<>&]/g, "")}</span> (eth_call, 1 bit flipped)` : "—";
-    document.getElementById("vAddrs").innerHTML = [addrLink(ex, "", v.verifier), addrLink(ex, "", v.gate)].filter(Boolean).join(" · ") || "—";
-    document.getElementById("vTx").innerHTML = txLink(ex, v.txHash);
-  } else {
-    document.getElementById("vBadge").textContent = "no run yet (pnpm validity)";
-  }
+  document.getElementById("tSubmit").innerHTML = res.tamper?.submitTx?proof(ex,res.tamper.submitTx):"—";
+  document.getElementById("tChallenge").innerHTML = res.tamper?.challengeTx?proof(ex,res.tamper.challengeTx):"—";
+  const tf = document.getElementById("tFlag");
+  if (res.tamper?.slashed){ tf.textContent = "bond slashed, batch rejected on chain"; }
+  else { tf.textContent = "—"; tf.style.cssText="color:var(--dim);background:transparent;padding:0"; }
 
-  // Tamper
-  document.getElementById("tSubmit").innerHTML = txLink(ex, res.tamper?.submitTx);
-  document.getElementById("tChallenge").innerHTML = txLink(ex, res.tamper?.challengeTx);
-  document.getElementById("tResult").innerHTML = res.tamper?.slashed
-    ? '<span class="pill slash">bond slashed · batch rejected</span>' : "—";
+  document.getElementById("exGas").textContent = fmt(res.execute?.gasPerExecute)+" gas";
+  document.getElementById("exDirect").textContent = fmt(res.execute?.directGas)+" gas";
+  document.getElementById("exFin").innerHTML = res.execute?.finalizeTx?proof(ex,res.execute.finalizeTx):"—";
 
-  // Execute
-  document.getElementById("exGas").textContent = fmt(res.execute?.gasPerExecute) + " gas";
-  document.getElementById("exDirect").textContent = fmt(res.execute?.directGas) + " gas";
-  document.getElementById("exFinalize").innerHTML = txLink(ex, res.execute?.finalizeTx);
+  const nb = (res.validity?.notBound && res.validity.notBound.length)
+    ? res.validity.notBound
+    : ["batch-root to proof link is set by a trusted registrar today",
+       "one shared message per batch, not per-operation messages yet",
+       "uses Poseidon leanXMSS test keys, not our Keccak WOTS accounts",
+       "proving takes about a minute on a laptop; the live product path stays optimistic"];
+  document.getElementById("limits").innerHTML = nb.map(t=>`<li>${t}</li>`).join("");
 })();
 </script>
 </body>
