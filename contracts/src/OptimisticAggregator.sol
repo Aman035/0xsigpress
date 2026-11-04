@@ -6,7 +6,8 @@ import {WOTS} from "./WOTS.sol";
 /// @title OptimisticAggregator
 /// @notice An aggregator posts a Merkle root over many (pkHash, m, keccak256(sig)) leaves with a bond.
 ///         Anyone can challenge a leaf during the window by revealing its signature; if the WOTS
-///         signature is invalid the batch is slashed and the bond goes to the challenger.
+///         signature is invalid the batch is slashed. A slash pays half the bond to the challenger and burns
+///         the rest, so an aggregator that challenges its own bad batch still loses half (SR-R2).
 contract OptimisticAggregator {
     error WrongBond();
     error UnknownBatch();
@@ -31,6 +32,9 @@ contract OptimisticAggregator {
         bool slashed;
         bool finalized;
     }
+
+    /// @notice Where the burned half of a slashed bond goes.
+    address public constant BURN = 0x000000000000000000000000000000000000dEaD;
 
     uint256 public immutable bond;
     uint256 public immutable window;
@@ -74,10 +78,7 @@ contract OptimisticAggregator {
         if (!_inBatch(b, leaf, index, proof)) revert NotInBatch();
         if (WOTS.verify(pkHash, m, sig)) revert SignatureValid();
 
-        b.slashed = true;
-        emit BatchSlashed(id, msg.sender, index);
-        (bool sent,) = msg.sender.call{value: bond}("");
-        if (!sent) revert TransferFailed();
+        _slash(id, b, msg.sender, index);
     }
 
     function finalize(uint256 id) external {
@@ -90,6 +91,17 @@ contract OptimisticAggregator {
         b.finalized = true;
         emit BatchFinalized(id);
         (bool sent,) = b.aggregator.call{value: bond}("");
+        if (!sent) revert TransferFailed();
+    }
+
+    /// @dev Mark slashed, pay half the bond to `to`, burn the rest.
+    function _slash(uint256 id, Batch storage b, address to, uint256 index) internal {
+        b.slashed = true;
+        emit BatchSlashed(id, to, index);
+        uint256 reward = bond / 2;
+        (bool sent,) = BURN.call{value: bond - reward}("");
+        if (!sent) revert TransferFailed();
+        (sent,) = to.call{value: reward}("");
         if (!sent) revert TransferFailed();
     }
 

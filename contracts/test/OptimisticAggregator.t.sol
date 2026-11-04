@@ -76,7 +76,8 @@ contract OptimisticAggregatorTest is Test {
         emit OptimisticAggregator.BatchSlashed(id, challenger, 2);
         vm.prank(challenger);
         agg.challenge(id, pks[2], ms[2], sigs[2], 2, _proof(2));
-        assertEq(challenger.balance, before + BOND);
+        assertEq(challenger.balance, before + BOND / 2); // SR-R2: half to the challenger
+        assertEq(agg.BURN().balance, BOND - BOND / 2); // the rest is burned
         (,,,, bool slashed,) = agg.batches(id);
         assertTrue(slashed);
         // cannot finalize or re-challenge a slashed batch
