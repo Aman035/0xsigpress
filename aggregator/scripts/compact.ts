@@ -79,7 +79,9 @@ for (let i = 0; i < A; i++) {
   const bal = await publicClient.getBalance({ address });
   const need = SEND * BigInt(opsPer);
   if (bal < need) {
-    await send(`top up account ${i}`, await walletClient.sendTransaction({ to: address, value: FUND, gas: 30_000n }));
+    // the clone's receive() delegatecalls the implementation, so a 21k-gas transfer is not enough
+    const g = await publicClient.estimateGas({ account, to: address, value: FUND });
+    await send(`top up account ${i}`, await walletClient.sendTransaction({ to: address, value: FUND, gas: mult(g) }));
   }
   accts.push({ index: i, seed, address, nonce });
 }
