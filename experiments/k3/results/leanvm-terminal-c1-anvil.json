@@ -1,0 +1,17 @@
+{
+ "what": "sol-spartan-whir LeanVmTwoCommitmentTerminal_KeccakPublicMemoryC1Pow28T6.verifyC1V1, checked-in proof, local anvil (cancun, code-size-limit 65536)",
+ "repo": "https://github.com/alxkzmn/sol-spartan-whir @ 18eda72 (main)",
+ "deployTxGasUsed": 13584540,
+ "verifyTxHash": "0x3b731abe4047a42ba4adbc5f373d47aa766d1ce469ece82e1b3a250aa2e55f4c",
+ "verifyTxStatus": "0x1",
+ "verifyTxGasUsed": 12896156,
+ "eth_call_return": "true",
+ "calldataBytes": 106628,
+ "calldataZeroBytes": 8934,
+ "calldataGas_4_16": 1598840,
+ "executionGas_derived": 11276316,
+ "calldataGas_monad_floor40": 4265120,
+ "runtimeBytes": 62732,
+ "initcodeBytes": 62758,
+ "tamper": {"flip byte 60000": "revert MERKLE_ROOT", "flip byte 1284": "revert SUMCHECK_IDENTITY"}
+}
