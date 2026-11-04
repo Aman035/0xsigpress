@@ -1,0 +1,1 @@
+keccak-bench/keccak_f1600.py (bit-per-field-element Keccak-f[1600], xor = a+b-2ab, no input bit decomposition / booleanity checks): leanVM execution cycles=664235 (try_execute_bytecode, no proof), 4 Nov 2026, vendor/leanVM-binding-v2 crates/lean_compiler/tests/sigpress_keccak_cycles.rs

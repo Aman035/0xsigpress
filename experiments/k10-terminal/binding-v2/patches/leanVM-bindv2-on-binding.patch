@@ -1,3 +1,29 @@
+diff --git a/crates/lean_compiler/tests/sigpress_keccak_cycles.rs b/crates/lean_compiler/tests/sigpress_keccak_cycles.rs
+new file mode 100644
+index 00000000..35f8a333
+--- /dev/null
++++ b/crates/lean_compiler/tests/sigpress_keccak_cycles.rs
+@@ -0,0 +1,20 @@
++// sigpress (K10 binding v2, candidate (a)): execute a zkDSL program (no proof) and print its cycle count
++// and table sizes. Path from SIGPRESS_ZKDSL. Run: cargo test --release -p lean_compiler --test
++// sigpress_keccak_cycles -- --nocapture
++use lean_compiler::*;
++use lean_vm::*;
++
++#[test]
++fn sigpress_cycle_count() {
++    let Ok(path) = std::env::var("SIGPRESS_ZKDSL") else { return };
++    let t = std::time::Instant::now();
++    let bytecode = compile_program(&ProgramSource::Filepath(path.clone()));
++    let compile_ms = t.elapsed().as_secs_f64() * 1000.0;
++    let t = std::time::Instant::now();
++    let result = try_execute_bytecode(&bytecode, &Default::default(), &ExecutionWitness::default(), false).unwrap();
++    println!(
++        "SIGPRESS_CYCLES path={path} cycles={} compile_ms={compile_ms:.0} exec_ms={:.0}",
++        result.pcs.len(),
++        t.elapsed().as_secs_f64() * 1000.0
++    );
++}
 diff --git a/crates/rec_aggregation/Cargo.toml b/crates/rec_aggregation/Cargo.toml
 index 8eb0b2f7..228ffb2f 100644
 --- a/crates/rec_aggregation/Cargo.toml
