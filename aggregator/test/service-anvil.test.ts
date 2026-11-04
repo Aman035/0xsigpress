@@ -84,7 +84,7 @@ after(async () => {
 const seedOf = (i: number) => keccak256(toBytes(`svc-e2e-${i}`));
 const RECIPIENT = "0x000000000000000000000000000000000000bEEF" as Address;
 
-test("anvil e2e: 10 good ops -> one batch -> executed; tampered batch -> watchtower slashes; missing DA is flagged", { skip, timeout: 180_000 }, async () => {
+test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op; tampered batch -> watchtower slashes; missing DA is flagged", { skip, timeout: 180_000 }, async () => {
   const user = await getClients({ rpc: RPC, privateKey: KEYS[0] });
   const pc = user.publicClient;
   const towerAddr = (await getClients({ rpc: RPC, privateKey: KEYS[2] })).account.address;
@@ -111,7 +111,7 @@ test("anvil e2e: 10 good ops -> one batch -> executed; tampered batch -> watchto
 
   const post = (body: unknown) => fetch(`${svc!.url}/ops`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body, (_, v) => (typeof v === "bigint" ? v.toString() : v)) });
   const value = parseEther("0.001");
-  const ops = [];
+  const ops: ReturnType<typeof signCompactOp>[] = [];
   for (let i = 0; i < 10; i++) {
     const account = await pc.readContract({ address: entry, abi: entryAbi, functionName: "accountOf", args: [BigInt(i)] });
     ops.push(signCompactOp({ seed: seedOf(i), keyIndex: 0, index: i, account, nonce: 0n, chainId: 31337, entry, call: { target: RECIPIENT, value, data: "0x" } }));
@@ -145,6 +145,28 @@ test("anvil e2e: 10 good ops -> one batch -> executed; tampered batch -> watchto
   const da = (await (await fetch(`${svc.url}${batch.da}`)).json()) as any;
   assert.equal(da.leaves.length, 10);
   await until("watchtower verified the good batch", () => events.find((e) => e.type === "ok" && e.id === BigInt(batchId)));
+
+  // --- a user runs a different op directly while their batched op waits: it goes as a dead op on chain ---
+  const next = [0, 1].map((i) => signCompactOp({ seed: seedOf(i), keyIndex: 1, index: i, account: ops[i]!.account, nonce: 1n, chainId: 31337, entry, call: { target: RECIPIENT, value, data: "0x" } }));
+  const ids2: string[] = [];
+  for (const o of next) ids2.push(((await (await post({ index: o.index, target: o.target, value: o.value, data: o.data, nextPkHash: o.nextPkHash, sig: o.sig })).json()) as any).id);
+  await until("second batch submitted", async () => ((await (await fetch(`${svc!.url}/ops/${ids2[1]}`)).json()) as any).batch?.id);
+  const other = signCompactOp({ seed: seedOf(1), keyIndex: 1, index: 1, account: ops[1]!.account, nonce: 1n, chainId: 31337, entry, call: { target: RECIPIENT, value: 2n, data: "0x" } });
+  const direct = await user.walletClient.writeContract({
+    address: ops[1]!.account,
+    abi: [{ type: "function", name: "executeDirect", stateMutability: "nonpayable", inputs: [{ type: "bytes32" }, { type: "address" }, { type: "uint256" }, { type: "bytes" }, { type: "bytes" }], outputs: [] }] as const,
+    functionName: "executeDirect",
+    args: [other.nextPkHash, other.target, other.value, other.data, other.sig],
+  });
+  assert.equal((await pc.waitForTransactionReceipt({ hash: direct })).status, "success");
+  const st2 = await until("second batch done", async () => {
+    const st = await Promise.all(ids2.map(async (id) => (await (await fetch(`${svc!.url}/ops/${id}`)).json()) as any));
+    return st.every((x) => x.status === "executed" || x.status === "failed") ? st : undefined;
+  });
+  assert.deepEqual(st2.map((x: any) => x.status), ["executed", "failed"]);
+  assert.match(st2[1].error, /dead op/);
+  const execR = await pc.getTransactionReceipt({ hash: st2[0].txHash });
+  assert.equal(parseEventLogs({ abi: entryAbi, logs: execR.logs, eventName: "OpSkipped" }).length, 1);
 
   // --- malicious aggregator: one tampered signature, its own DA server, posted directly ---
   const evil = await getClients({ rpc: RPC, privateKey: KEYS[3] });

@@ -75,6 +75,12 @@ class FakeChain implements ChainAdapter {
     const executed = [];
     for (const o of ops) {
       const a = st[o.accountIndex]!;
+      if (o.dead) {
+        if (!(a.nonce > o.nonce || (a.nonce === o.nonce && a.pkHash !== o.pkHash))) throw new Error("OpNotDead");
+        const dm = messageOf(CHAIN_ID, ENTRY, o.pkHash, o.nextPkHash, payloadHash(a.address, o.nonce, o));
+        leaves.push(keccak256(concat([o.pkHash, dm, o.sigHash])));
+        continue;
+      }
       const m = messageOf(CHAIN_ID, ENTRY, a.pkHash, o.nextPkHash, payloadHash(a.address, a.nonce, o));
       leaves.push(keccak256(concat([a.pkHash, m, o.sigHash])));
       executed.push({ account: a.address, nonce: a.nonce, success: true });
@@ -325,5 +331,25 @@ test("batcher: single-op fallback runs executeDirect when batches cannot be subm
   assert.equal(op.via, "direct");
   assert.equal(s.chain.accounts[0]!.nonce, 1n);
   assert.ok(existsSync(join(s.dir, "state.json")));
+  s.done();
+});
+
+test("batcher: an op whose account moved on chain after finalize goes as a dead op; the rest still execute", async () => {
+  const s = setup(3, { maxWaitMs: 0 });
+  const b = s.make();
+  const ids = [];
+  for (const i of [0, 1, 2]) ids.push((await b.accept(sign(s.chain, i, 0))).op.id);
+  await b.tick();
+  assert.equal(b.getBatch("b0")!.status, "submitted");
+  // Account 1's owner runs a different op at nonce 0 directly while the batch is in its window.
+  s.chain.accounts[1]!.nonce = 1n;
+  s.chain.accounts[1]!.pkHash = keygen(seedOf(1), 1).pkHash;
+  s.chain.t += WINDOW;
+  await b.tick();
+  assert.equal(b.getBatch("b0")!.status, "executed");
+  assert.deepEqual(ids.map((id) => b.getOp(id)!.status), ["executed", "failed", "executed"]);
+  assert.match(b.getOp(ids[1]!)!.error!, /dead op/);
+  assert.equal(s.chain.accounts[0]!.nonce, 1n);
+  assert.equal(s.chain.accounts[2]!.nonce, 1n);
   s.done();
 });
