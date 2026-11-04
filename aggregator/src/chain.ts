@@ -11,6 +11,9 @@ export const AGG_DIR = resolve(here, "..");
 dotenv.config({ path: resolve(AGG_DIR, "../.env") });
 
 export const MONAD_TESTNET_RPC = "https://testnet-rpc.monad.xyz";
+/** Fixed gas limit for OptimisticAggregator.challenge / slash calls (execution <= ~190k measured in forge). */
+export const CHALLENGE_GAS = 400_000n;
+
 export const MONAD_EXPLORER = "https://testnet.monadexplorer.com";
 
 export interface Deployments {

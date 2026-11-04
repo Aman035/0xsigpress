@@ -1,6 +1,6 @@
 // Batch with one bad signature -> challenger finds it off chain -> challenge -> slashed.
 import { parseEventLogs } from "viem";
-import { getClients, loadDeployments, txLink } from "../src/chain.ts";
+import { CHALLENGE_GAS, getClients, loadDeployments, txLink } from "../src/chain.ts";
 import { aggregatorAbi } from "../src/abi.ts";
 import { buildBatch } from "../src/batch.ts";
 import { verify } from "../src/wots.ts";
@@ -45,6 +45,9 @@ const challengeTx = await walletClient.writeContract({
   abi: aggregatorAbi,
   functionName: "challenge",
   args: [id, op.pkHash, op.m, op.sig, BigInt(bad), proof],
+  // Monad's eth_estimateGas returned ~2.5M for this call (execution is <=188k in forge); Monad charges the
+  // limit, so use a fixed safe cap instead of the estimate.
+  gas: CHALLENGE_GAS,
 });
 console.log(`challenge ${txLink(explorer, challengeTx)}`);
 const chReceipt = await publicClient.waitForTransactionReceipt({ hash: challengeTx });

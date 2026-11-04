@@ -6,7 +6,7 @@
 // the batcher's avoids nonce races with the batcher's own txs.
 import { parseEventLogs, type Address, type Hex } from "viem";
 import { aggregatorAbi } from "../abi.ts";
-import { getClients } from "../chain.ts";
+import { CHALLENGE_GAS, getClients } from "../chain.ts";
 import { MerkleTree } from "../merkle.ts";
 import { leafOf } from "../op.ts";
 import { revertReason } from "./chain.ts";
@@ -63,7 +63,7 @@ export async function startRevealer(opts: RevealerOptions) {
     if (!l) return true;
     const args = [id, BigInt(index), l.pkHash, l.m, l.sig, new MerkleTree(leaves).proof(index)] as const;
     await publicClient.simulateContract({ account, address: opts.aggregator, abi: aggregatorAbi, functionName: "reveal", args });
-    const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "reveal", args });
+    const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "reveal", args, gas: CHALLENGE_GAS });
     const r = await publicClient.waitForTransactionReceipt({ hash });
     if (r.status !== "success") throw new Error(`reveal tx reverted ${hash}`);
     log(`batch ${id}: revealed leaf ${index} (${hash})`);

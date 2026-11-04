@@ -15,7 +15,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseEventLogs, type Address, type Hex } from "viem";
 import { aggregatorAbi } from "../abi.ts";
-import { AGG_DIR, getClients, MONAD_EXPLORER, txLink } from "../chain.ts";
+import { AGG_DIR, CHALLENGE_GAS, getClients, MONAD_EXPLORER, txLink } from "../chain.ts";
 import { checkDA, type DADoc } from "./da.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 import { revertReason } from "./chain.ts";
@@ -119,7 +119,7 @@ export async function startWatchtower(opts: WatchtowerOptions) {
 
   const send = async (functionName: "slashUnrevealed" | "reclaimDeposit", args: readonly [bigint, bigint]) => {
     await publicClient.simulateContract({ account, address: opts.aggregator, abi: aggregatorAbi, functionName, args });
-    const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName, args });
+    const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName, args, gas: CHALLENGE_GAS });
     const r = await publicClient.waitForTransactionReceipt({ hash });
     if (r.status !== "success") throw new Error(`${functionName} tx reverted ${hash}`);
     return hash;
@@ -285,7 +285,7 @@ export async function startWatchtower(opts: WatchtowerOptions) {
     const args = [b.id, leaf.pkHash, leaf.m, leaf.sig, BigInt(i), res.tree.proof(i)] as const;
     try {
       await publicClient.simulateContract({ account, address: opts.aggregator, abi: aggregatorAbi, functionName: "challenge", args });
-      const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "challenge", args });
+      const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "challenge", args, gas: CHALLENGE_GAS });
       b.challengeTx = hash;
       save();
       const r = await publicClient.waitForTransactionReceipt({ hash });
