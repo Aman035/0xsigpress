@@ -5,15 +5,15 @@
     "calldataBytes": 2276
   },
   "batch": {
-    "txHash": "0x0065d88556262c4b2e636f4c10f3f91490f77f3c91b40920ab62163d2886b8b3",
+    "txHash": "0xe225986bb088f07e1cd63e6ee95c63cc7df83dd8056018cdaafdf2d7ede07098",
     "gasUsed": 110494,
     "count": 256,
-    "root": "0x0b7524a02a77014f47644b6d7345214403e0586cb9562761be56193ae1de059f",
+    "root": "0x3bf1d9f7be12116f4ed94de73ce6ac8a9bfbd99043597af6837e50d4c0544908",
     "bytesPerOp": 0.890625
   },
   "tamper": {
-    "submitTx": "0x43232b64468d95c2ce7504558219ae58c8143bc018100e52ee5c413e39d832b3",
-    "challengeTx": "0xb70bc8504a8289cc276a36a7760f78f00c5639a5c8b5f4d1560d99b1fc97393a",
+    "submitTx": "0xb866f8688041568a9ef694296302491e9558fd47c0a91d468e0441c4be95e62c",
+    "challengeTx": "0x7dae037aaa41696b8d2053b0fd333f35b4f107c966b81362b4d5197d61e873d8",
     "slashed": true
   },
   "execute": {
@@ -49,19 +49,19 @@
     "directGas": 186088
   },
   "stage": {
-    "startedAt": "2026-11-04T09:25:27.744Z",
+    "startedAt": "2026-11-04T09:44:18.380Z",
     "n": 256,
     "chainId": 10143,
-    "account": "0x445a0c4780a8107158df60B18Ee5372497dc1D12",
+    "account": "0xf379767970946d94cea9866Bd581d10b1fe02311",
     "batch": {
-      "txHash": "0x0065d88556262c4b2e636f4c10f3f91490f77f3c91b40920ab62163d2886b8b3",
-      "batchId": 14,
+      "txHash": "0xe225986bb088f07e1cd63e6ee95c63cc7df83dd8056018cdaafdf2d7ede07098",
+      "batchId": 16,
       "gasUsed": 110494,
       "inputBytes": 228,
       "bytesPerOp": 0.890625,
-      "signMs": 3729,
-      "confirmMs": 790,
-      "at": "2026-11-04T09:25:32.670Z"
+      "signMs": 3690,
+      "confirmMs": 1522,
+      "at": "2026-11-04T09:44:23.983Z"
     },
     "comparison": {
       "naiveTx": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
@@ -70,19 +70,27 @@
       "naiveGasPerOp": 143278,
       "batchBytesPerOp": 0.890625,
       "batchGasPerOp": 431.6171875,
-      "at": "2026-11-04T09:25:32.672Z"
+      "at": "2026-11-04T09:44:23.986Z"
     },
     "tamper": {
-      "submitTx": "0x43232b64468d95c2ce7504558219ae58c8143bc018100e52ee5c413e39d832b3",
-      "challengeTx": "0xb70bc8504a8289cc276a36a7760f78f00c5639a5c8b5f4d1560d99b1fc97393a",
-      "batchId": 15,
+      "submitTx": "0xb866f8688041568a9ef694296302491e9558fd47c0a91d468e0441c4be95e62c",
+      "challengeTx": "0x7dae037aaa41696b8d2053b0fd333f35b4f107c966b81362b4d5197d61e873d8",
+      "batchId": 17,
       "badIndex": 7,
       "slashed": true,
-      "challengeGas": 207600,
-      "checkMs": 54,
-      "at": "2026-11-04T09:25:38.703Z"
+      "challengeGas": 211242,
+      "checkMs": 46,
+      "at": "2026-11-04T09:44:29.699Z"
     },
-    "finishedAt": "2026-11-04T09:25:38.703Z"
+    "validity": {
+      "txHash": "0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1",
+      "gasCharged": 12788255,
+      "signatures": 512,
+      "proofDir": "out/validity/2026-11-04T09-42-32-561Z-2x256-n256",
+      "tamperReason": "MERKLE_ROOT",
+      "at": "2026-11-04T09:44:33.646Z"
+    },
+    "finishedAt": "2026-11-04T09:44:33.648Z"
   },
   "compact": {
     "txHash": "0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd",
@@ -90,5 +98,41 @@
     "bytesPerOp": 98,
     "gasCharged": 3479589,
     "gasPerOp": 27184
+  },
+  "validity": {
+    "txHash": "0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1",
+    "gasEstimate": 12179291,
+    "gasCharged": 12788255,
+    "calldataBytes": 106340,
+    "signatures": 512,
+    "perChild": 256,
+    "gasPerSignature": 24977,
+    "bytesPerSignature": 207.7,
+    "proofBytes": 110533,
+    "verifyCalldataBytes": 106276,
+    "proveSeconds": 60.6,
+    "verifier": "0xf563BB0b43d6090C89D45a7A780c8AB0175d92d2",
+    "gate": "0xE2BFD06CC8677df23909dD4ee801b2A9D286f119",
+    "shape": "2x256",
+    "leftBatchRoot": "0xd20ce22bd80db78db917ba5f555476a1b9957b3471a722c1100d6d370f9ad4d4",
+    "rightBatchRoot": "0xe720ec1b16c4be02cd92f5ce783e2c4fdb2b420dc82b2d163bfe33236ee95eb7",
+    "registerTx": "0xed7516c3f47833ac5f3cdbfea7a9236a09b96536eb12ad1714a31f601c7b5c27",
+    "accepted": true,
+    "tamper": {
+      "flippedByte": 60000,
+      "reverted": true,
+      "reason": "MERKLE_ROOT"
+    },
+    "provedAt": "2026-11-04T09:44:13.717Z",
+    "replay": false,
+    "at": "2026-11-04T09:44:33.646Z",
+    "notBound": [
+      "batch root -> applicationRoot is registered by a trusted registrar (recomputed off chain, not by the contract)",
+      "signer set is inside the proof's digest; the contract never sees the public keys",
+      "one shared 32-byte message per child batch, not per-user ops; exactly two children",
+      "KoalaBear/Poseidon leanXMSS with deterministic test keys, not our WOTS.sol accounts",
+      "security = the authors' 100-bit component targets; full-chain composition not analysed"
+    ],
+    "proofDir": "out/validity/2026-11-04T09-42-32-561Z-2x256-n256"
   }
 }
