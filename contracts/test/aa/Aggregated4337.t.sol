@@ -78,8 +78,17 @@ contract Aggregated4337Test is Test {
         return keccak256(abi.encodePacked(a, b));
     }
 
-    /// 4-leaf tree (pads to 4 with zero leaves).
+    /// Spec tree over up to 4 leaves (zero-padded to the next power of two, like merkle.ts).
     function _tree(bytes32[] memory leaves) internal pure returns (bytes32 root, bytes32[][] memory proofs) {
+        if (leaves.length == 2) {
+            root = _h(leaves[0], leaves[1]);
+            proofs = new bytes32[][](2);
+            for (uint256 i = 0; i < 2; i++) {
+                proofs[i] = new bytes32[](1);
+                proofs[i][0] = leaves[i ^ 1];
+            }
+            return (root, proofs);
+        }
         bytes32[4] memory l;
         for (uint256 i = 0; i < leaves.length; i++) l[i] = leaves[i];
         bytes32 left = _h(l[0], l[1]);

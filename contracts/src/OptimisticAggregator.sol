@@ -17,6 +17,7 @@ contract OptimisticAggregator {
     error NotInBatch();
     error SignatureValid();
     error TransferFailed();
+    error BadWindow();
 
     event BatchSubmitted(uint256 indexed id, address indexed aggregator, bytes32 root, uint32 count, string dataURI);
     event BatchSlashed(uint256 indexed id, address indexed challenger, uint256 index);
@@ -37,6 +38,8 @@ contract OptimisticAggregator {
     mapping(uint256 => Batch) public batches;
 
     constructor(uint256 bond_, uint256 window_) {
+        // deadline is stored as uint64(block.timestamp + window): keep the sum far from truncating
+        if (window_ > type(uint64).max / 2) revert BadWindow();
         bond = bond_;
         window = window_;
     }
@@ -68,7 +71,7 @@ contract OptimisticAggregator {
         if (b.slashed) revert AlreadySlashed();
         if (block.timestamp >= b.deadline) revert WindowClosed();
         bytes32 leaf = leafOf(pkHash, m, sig);
-        if (computeRoot(leaf, index, proof) != b.root) revert NotInBatch();
+        if (!_inBatch(b, leaf, index, proof)) revert NotInBatch();
         if (WOTS.verify(pkHash, m, sig)) revert SignatureValid();
 
         b.slashed = true;
@@ -96,7 +99,25 @@ contract OptimisticAggregator {
         returns (bool)
     {
         Batch storage b = batches[id];
-        return b.finalized && !b.slashed && computeRoot(leaf, index, proof) == b.root;
+        return b.finalized && !b.slashed && _inBatch(b, leaf, index, proof);
+    }
+
+    /// @dev Membership = one of the batch's `count` real leaves: index < count and a proof of exactly the tree's
+    ///      depth. Without this an internal node (shorter proof), a zero padding leaf (index >= count) or an
+    ///      index with extra high bits would also verify against the root.
+    function _inBatch(Batch storage b, bytes32 leaf, uint256 index, bytes32[] calldata proof)
+        internal
+        view
+        returns (bool)
+    {
+        uint256 count = b.count;
+        if (index >= count || proof.length != depthOf(count)) return false;
+        return computeRoot(leaf, index, proof) == b.root;
+    }
+
+    /// @notice Depth of the zero-padded tree over `count` leaves (smallest d with 2^d >= count; 0 for count <= 1).
+    function depthOf(uint256 count) public pure returns (uint256 d) {
+        while ((uint256(1) << d) < count) d++;
     }
 
     // ---- client helpers ----
