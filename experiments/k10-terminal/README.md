@@ -1,151 +1,197 @@
-# K10-terminal: finding the Keccak terminal prover (research, throwaway)
+# K10-terminal: our leanXMSS batches -> leanVM -> lift -> Keccak terminal -> Solidity, on Monad
 
-Date: 4 Nov 2026. Machine: Apple M4 (base), 16 GB. Clones live in `vendor/` (git-ignored).
+Research, throwaway. Date: 4 Nov 2026. Machine: Apple M4 (base, 10 cores), 16 GB. Vendored clones in
+`vendor/` (git-ignored); our changes to them are in `patches/`; raw outputs in `runs/` and `results/`.
 
-## Verdict
+## Result
 
-**Found.** The terminal prover is public: branch `recursive-verifier` of
-[Client-Side-Proving/leanVM](https://github.com/Client-Side-Proving/leanVM/tree/recursive-verifier)
-(a fork of leanEthereum/leanVM), HEAD `fb0909d`, main commit `9c9ff81` "Add Spartan-WHIR recursion and
-grouped terminal proofs" by Alex Kuzmin, 15 Oct 2026. Licence: **Apache-2.0** (`LICENSE` file checked).
-Its README says the fork "adds a Spartan-WHIR verifier guest, explicit recursive proof profiles, grouped
-LogUp proving, and Keccak terminal proof export". The entry point is `script/run_terminal_fixture.py`,
-which builds `leanvm-recursion-profile` and writes `benchmark-results/<dir>/native/root-fixture.json`:
-the exact path the Solidity generator in sol-spartan-whir expects (`../leanVM/benchmark-results/terminal-c1-...`).
+**End to end works, including on Monad testnet**, for 2 batches x 4 leanXMSS signatures (8 sigs):
 
-**But it does not produce proofs our deployed verifier accepts.** Three reasons, all from source:
+our two signature batches -> two leanVM aggregation proofs -> two lifts -> one Keccak240 terminal root
+proof -> Solidity verifier generated for exactly this chain -> verified on anvil and on Monad testnet,
+through a small gate contract that binds the proof's application root to our two 32-byte batch roots.
 
-1. **Protocol version.** The deployed verifier (`0x4fa20bd7…c4be`, from `alxkzmn/sol-spartan-whir@18eda72`)
-   derives its Fiat-Shamir capacity with profile tag `0x57500001`
-   (`script/generate_leanvm_two_commitment_terminal_fixture.py:175`). The prover now uses `0x57500002`
-   (`crates/lean_prover/src/profile.rs:421`, with a unit test asserting the two differ). The README:
-   "WHIR continuation rounds keep the carried sumcheck claim at coefficient one and assign the new OOD
-   and query claims coefficients gamma, gamma^2, … earlier client and LeanVM proof artifacts require
-   regeneration after the corresponding protocol corrections." So the C1 verifier we deployed is from a
-   superseded (corrected) protocol version. Upstream `ethereum/sol-whir-p3@b82359e` uses `0x57500002`
-   and in PR #11 "Remove[d] superseded C1 outputs", keeping only the grouped terminal.
-2. **Pinned programs.** Every generated verifier pins the fixed-program commitment (the three
-   concatenated bytecodes: child guest, lift, root) and the WHIR profile. A different child program
-   (ours) means a newly generated verifier contract. That is by design, not a blocker: the generator
-   emits the contract from `root-fixture.json`.
-3. **The source revision behind the deployed fixture is not published.** The branch is one squashed
-   commit on top of upstream `98cb2ad`; the September state that produced `0x57500001` fixtures is not
-   in it.
+| Monad testnet (chain 10143) | Value | Tx |
+|---|---|---|
+| Verifier `LeanVmTwoCommitmentTerminal_SigpressXmssC1N4` deployed | `0x92a964b177f2d6726121829df3218b9e667f4e9b`; estimate 13,572,655, charged 14,251,287 (limit) | `0xbc69dcabdd3a10f786aa1f4dce3abd4b395addcac8a532412bb3c7fa6ccbd62d` |
+| `eth_call verifyC1V1(proof)` | `true` | RPC |
+| Same proof, 1 bit flipped at byte 60,000 | reverts `MERKLE_ROOT` | RPC |
+| Gate `SigpressTerminalGate` deployed | `0x457f78edcdef6de1af2ce16ed62af567d0e5fef9` | `0xc038e32853b9493dbcb559e55ea8cf944c915ba5fa34ebba7ddd52925bcaa3ab` |
+| `register(left, right, applicationRoot)` | ok | `0xcf5754f60cd9e01ef365213ccf5f04567f56a35db48a71fc176e4fa438609d3c` |
+| `submit` with left/right batch roots swapped (`eth_call`) | reverts `ROOT_MISMATCH` | RPC |
+| **`submit(proof, left, right)`: verify terminal proof + check root, one tx** | **status 1; estimate 12,188,298 gas, charged 12,797,712 (limit)**; calldata 106,404 B | `0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92` |
+| `accepted(pairKey(left, right))` | `true` | RPC |
 
-So "reproduce the fixture the deployed contract accepts" is not reachable. "Generate a fresh terminal
-proof and a matching verifier" is reachable in principle (see below).
+Batch roots (the 32-byte message each batch signs): left
+`0xeaad7898beffecdf1307b1d0dcbe59bdac732f75722231629e5886e56ca33a76` (= sha256("sigpress-left-batch")),
+right `0x0ab8a68e4d9be29dbd9ba0c8612285b203a9fb00315823b1e9fb99278a2acf6d` (= sha256("sigpress-right-batch")).
+Override with `SIGPRESS_LEFT_ROOT` / `SIGPRESS_RIGHT_ROOT`. Gas price on the day: 102 gwei. We skipped the
+standalone `verifyC1V1` tx on Monad to save faucet MON (`SKIP_VERIFY_TX=1`); `submit` includes it.
+Anvil (Prague, 128 KB code limit) numbers for the same proof: standalone verify tx **12,093,782 gas**,
+submit 12,168,193, verifier deploy 13,476,927. Runtime 62,243 B (fits Monad's 128 KB, not Ethereum's 24 KB).
 
-## How the terminal chain works (read from source)
+The `submit_swapped_roots_eth_call` lines in `results/*-n4.jsonl` originally printed
+`"ROOT_MISMATCH\nunexpected"` (a `pipefail` bug in the script's fallback echo; the call did revert with
+`ROOT_MISMATCH`). We fixed the script and cleaned those two lines by hand.
 
-Programs, in order (`crates/spartan_whir_guest/README.md`, `crates/rec_aggregation/src/binary_recursion.rs`):
+## Prover numbers (measured, this machine)
 
-1. **Direct proof.** A leanVM guest program runs; its execution proof uses a Poseidon1 profile.
-   In the authors' pipeline the guest is a Spartan-WHIR verifier checking a client proof (a Privacy
-   Pools-style withdrawal R1CS from `ethereum/spartan-whir`). Public input: an 8-element statement digest.
-2. **Lift.** `lift_execution_proof_with_profiles(child_bytecode, lifted_bytecode, application_digest, …)`
-   verifies one direct proof inside leanVM, and hashes the child's bytecode claim with the
-   application digest into its public input.
-3. **Terminal root (binary node).** `prove_terminal_binary_node_c1_v1_with_preprocessing(spark, lift,
-   root, [two lifted proofs], …)` verifies **two** lifts and computes
-   `application_root = Poseidon1("NOD1", 2, left_digest, right_digest)` (`binary_application_root`).
-   This root proof is made with the **Keccak240** hash profile (`terminal_keccak: true`) and is what the
-   Solidity verifier checks. The Solidity side gets the application root through public memory.
+One process proves both direct proofs, both lifts and the root, then natively verifies all five and
+runs the authors' negative checks (changed application root, changed program evaluation, wrong terminal
+profile, wrong fixed-program commitment: all rejected). Times are single diagnostic runs (not averaged),
+with other desktop apps open. RSS from `/usr/bin/time -l` (max RSS / macOS peak footprint, which
+includes compressed memory).
 
-Profiles: `crates/spartan_whir_guest/profiles/terminal_c1.json` (two-commitment C1, matches the
-contract family we deployed) and `terminal_grouped.json` (grouped LogUp, the upstream choice;
-"full composition security remains under review"). Both target 100-bit WHIR components with direct/lift/root
-grinding 22/24/28 bits.
+| Batches | child dim | direct L / R | direct proof B | lift L / R | root (Keccak) | **terminal proof B** | all proving | wall | max RSS / footprint |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 x 4 | 20 | 0.35 / 1.13 s | 137,530 | 8.8 / 8.5 s | 22.2 s | 110,531 | 40.9 s | 47.9 s | 5.87 GB / 15.2 GB |
+| 2 x 64 | 22 | 0.78 / 1.02 s | 179,071 | 7.2 / 9.2 s | 33.3 s | 110,984 | 51.6 s | 59.1 s | 5.39 GB / 15.1 GB |
+| 2 x 256 | 24 | 1.93 / 1.80 s | 207,719 | 9.5 / 11.4 s | 33.1 s | 110,952 | 57.7 s | 66.8 s | 5.99 GB / 14.7 GB |
+| 2 x 4, padded to the 2 x 256 shape | 24 | 1.64 / 1.10 s | — | 7.9 / 8.8 s | 25.7 s | — | — | 51.9 s* | 6.17 GB / 14.1 GB |
 
-## What the terminal proof commits to, and binding it to our batch
+\* ran concurrently with a `forge test`, so its timing is pessimistic.
 
-- The terminal statement is the application root: an ordered Poseidon1 hash (KoalaBear, 8 field
-  elements) of the two children's 8-element public inputs.
-- The lift and terminal APIs take the child bytecode as a parameter (`child_bytecode: &Bytecode`, named
-  `spark_bytecode` in the terminal), so the child does not have to be the Spartan guest. This branch also
-  carries leanVM's KoalaBear XMSS aggregation (`rec_aggregation::aggregate_single_message_signatures`,
-  `merge_single_message_aggregates`, `get_aggregation_bytecode()`), whose public input is
-  `poseidon_hash_slice(input_data)` over (domain sep, pubkeys hash, hashed message, slot Merkle chunks,
-  tweaks hash). That gives a plausible chain, **not tried end to end**:
-  XMSS aggregate (KoalaBear/Poseidon) -> lift -> Keccak terminal root -> generated Solidity verifier.
-- Gaps we found by reading code (none tested):
-  - The XMSS aggregation proves with `default_whir_config(log_inv_rate)`; `lift` verifies children with
-    an explicit `WhirExecutionProfile`. The two must be made to agree (new profile plumbing or an
-    explicit profile for the aggregation program).
-  - The terminal root needs exactly two children. With one batch, either split it into two aggregates
-    or write a one-child root.
-  - Single-message aggregation assumes one shared message per aggregate; distinct per-user messages go
-    through `merge_single_message_aggregates` (up to `MAX_RECURSIONS = 16` children per merge), which
-    costs recursion steps (cost unmeasured).
-  - The 32-byte batch root on chain: the contract sees a Poseidon1/KoalaBear application root. To bind
-    it to a Keccak batch root of (pubkey, message) pairs we would either (a) compute Poseidon1 over the
-    batch in Solidity (gas unmeasured; sol-spartan-whir already has `LeanVmPoseidon1.sol`), or (b) have
-    a guest program compute a Keccak digest of the batch and expose it as the public input (we did not
-    check whether this KoalaBear branch has an in-VM Keccak precompile; without one Keccak is ordinary
-    instructions, cost unmeasured).
-  - The leanXMSS here is the KoalaBear/Poseidon variant (not the Keccak leanXMSS of leanVM `main`
-    used in K5). The user-side / fraud-proof Solidity check must match whichever scheme we pick.
-  - Prover memory: the authors report 17.8 GB peak RSS for their production chain (M4 Pro, 48 GB).
-    Our box has 16 GB. Our chain's numbers are unmeasured.
+Plus, outside proving: aggregation-bytecode compile + key generation ~1.6 s, lift compile ~0.9 s, root
+compile ~1.1 s, fixed-program commitment (once per verifier) ~2.3-2.6 s.
 
-## What we ran
+On-chain side, anvil (Prague), each with its own generated verifier:
+
+| Batches | calldata B | verify tx gas | gate `submit` gas | generated tests |
+|---|---|---|---|---|
+| 2 x 4 | 106,340 | 12,093,782 | 12,168,193 | 16/16 |
+| 2 x 64 | 106,692 | 12,105,473 | 12,180,094 | 16/16 |
+| 2 x 256 | 106,628 | 12,100,827 | 12,175,409 | 16/16 |
+
+What this shows:
+- **On-chain cost is flat in N**: ~106.5 KB and ~12.1M gas for 8 or 512 signatures (= ~23.6k gas/sig
+  and ~208 B/sig at 512, from these runs). The prover time is dominated by lift + root (~40-55 s here),
+  which barely moves with N because the lift and root programs have fixed size (dim 23).
+- **One verifier per shape, not per N.** Each child dimension gets a different lift/root program and
+  so a different verifier (the 2 x 64 proof is rejected by the 2 x 4 verifier: `FIXED_PROGRAM_ROOT`).
+  But padding the child tables with `SIGPRESS_MIN_LOG_ROWS=18,13,16` makes a 2 x 4 proof use the exact
+  same fixed programs as 2 x 256 (bytecode MLE hashes equal, generated contract config identical), and
+  the **already-deployed 2 x 256 verifier accepts it** (`results/anvil-n4pad256-on-n256-verifier.json`).
+  So a product deploys one verifier for a maximum shape and pads smaller batches.
+- **16 GB was enough** for all runs (max RSS ≤ 6.2 GB, though macOS reported ~14-15 GB peak footprint).
+
+**Not done on Monad:** the 2 x 64 / 2 x 256 verifiers. The 2 x 4 run used 2.85 MON (deploy 14.25M gas
++ submit 12.8M gas charged, at 102 gwei); 0.154 MON is left and the three faucet calls are spent. A
+2 x 256 verifier deploy plus one submit needs about 2.8 MON (estimate from the anvil gas x 1.05 x 102 gwei).
+
+## What we built (and why)
+
+Base: `Client-Side-Proving/leanVM` branch `recursive-verifier` @ `fb0909d` (Apache-2.0). Patch:
+`patches/leanVM-recursive-verifier-fb0909d.patch`.
+
+1. **`rec_aggregation::prepare_raw_single_message_execution`** (new, ~85 lines). The leanXMSS
+   aggregation (`aggregate_single_message_signatures`) proves with `default_whir_config`, but the lift
+   verifies children under an explicit `WhirExecutionProfile`. The new function does everything the
+   aggregation does for a raw batch (sort/dedupe signers, tweak table, public-input preimage, hints)
+   except the final proof, and returns `(public_input, witness, signers, preimage)`. We then prove the
+   same aggregation bytecode with `prove_execution_with_profile(&profiles.direct)`. That was the whole
+   "profile mismatch" gap: plumbing, no protocol change.
+2. **`sigpress-xmss-terminal`** binary (modified copy of `leanvm-recursion-profile.rs`, Apache-2.0,
+   modification notice at the top). The two Spartan-WHIR client fixtures (which would need the
+   unlicensed `ethereum/spartan-whir`) are replaced by two leanXMSS batches generated in-process:
+   deterministic keys (`xmss_key_gen_from_seed`, active for slot 7 only), each batch signs its own
+   32-byte batch root, each signature checked with `xmss_verify` before proving. Everything after the
+   direct proofs (lift, terminal C1 root with Keccak240, fixed-program commitment, `root-fixture.json`
+   export, negative checks) is the authors' code, unchanged.
+3. **Profile** `profiles/sigpress_c1.json`: the authors' `terminal_c1.json` (100-bit WHIR components,
+   direct/lift/root grinding 22/24/28) minus the two pinned child dimensions (29 / 23, sized for their
+   Spartan guest); the runner fills in the actual ones.
+4. **Solidity generation** with `ethereum/sol-whir-p3@b82359e`'s
+   `script/generate_leanvm_two_commitment_terminal_fixture.py` (its C1 path already uses tag
+   `0x57500002`, matching the prover). Two blockers, both worked around:
+   - it imports an unpublished module `terminal_hashes` from the authors' research workspace. We wrote
+     our own `tools/terminal_hashes.py` (pure-Python Keccak-256, checked against `cast keccak`, and the
+     inverse of leanVM's `encode_keccak240`);
+   - it requires provenance written by `run_terminal_fixture.py`. `patches/sol-whir-p3-b82359e.patch`
+     adds `SIGPRESS_NO_PROVENANCE=1` to skip that check.
+   The generated test suite passes (16/16: accept + 15 rejection cases).
+   **Licence note:** sol-whir-p3 has no LICENSE file; we rely on its `SPDX-License-Identifier: MIT`
+   headers for this research use. Nothing from it is copied into the product.
+5. **`gate/src/SigpressTerminalGate.sol`** (ours, MIT): `register(left, right, applicationRoot)` by a
+   registrar, `submit(proof, left, right)` checks `keccak(proof.applicationRoot)` equals the registered
+   value and that the verifier accepts. `tools/app_root.py` recomputes the application root off chain
+   from the two child public inputs (Poseidon1, via leanVM's Apache-2.0 Python reference) and checks it
+   equals the proof's root: **match** for our run.
+
+## What the proof binds, and what it does not yet
+
+Bound by the proof (checked on chain by the verifier): the root program verified two lifts of two
+executions of the **fixed leanXMSS aggregation bytecode**, and its public memory is
+`applicationRoot = Poseidon1("NOD1", 2, leftDigest, rightDigest)`. Each digest is the aggregation's public
+input: `poseidon_hash_slice(n_sigs, hash(pubkeys), hash_message(batch_root), slot, tweaks hash,
+bytecode claim, domain sep)`. So the root commits to both signer sets, both batch roots and the slot.
+
+Not bound on chain yet:
+- **Batch root -> applicationRoot.** The gate trusts the registrar's mapping. An honest observer can
+  recompute it (our `app_root.py` does the last step; the child digests come from the Rust prepare
+  function), but the contract does not. Options: compute Poseidon1 over KoalaBear in Solidity
+  (sol-whir-p3 has `LeanVmPoseidon1.sol`; gas unmeasured), or change the root program to expose a
+  Keccak digest.
+- **Signer set.** The contract never sees the pubkeys; they are inside the digest. Account <-> pubkey
+  binding needs the same recomputation.
+- **Statement shape.** Single-message aggregation: every signer in a batch signs the *same* 32-byte
+  message. Per-user messages (userOps) need multi-message aggregation (`merge_single_message_aggregates`)
+  or a different guest. Exactly two children per terminal.
+- **Scheme.** This is the KoalaBear/Poseidon leanXMSS (`crates/xmss` on this branch), not the
+  Keccak leanXMSS on leanVM `main` (K5) and not our Solidity `WOTS.sol`.
+- **Security.** Profiles are the authors' 100-bit WHIR component targets; their README says a
+  complete-chain security claim needs a composition analysis. Signing keys are deterministic test seeds.
+
+## Commands
 
 ```sh
-git clone --branch recursive-verifier https://github.com/Client-Side-Proving/leanVM.git vendor/leanVM   # fb0909d
-cd vendor/leanVM   # rust-toolchain.toml pins nightly-2026-03-04 (rustup installs it)
-cargo build --locked --release -p spartan_whir_guest --bin leanvm-recursion-profile --bin leanvm-binary-node  # 1m05s
-/usr/bin/time -l ./target/release/leanvm-binary-node smoke-control > ../../results/smoke-control.json
-cargo test --locked --release -p lean_prover --test terminal_hash_profiles
-F=crates/spartan_whir_guest/testdata/full_zk_spark_poseidon1
-./target/release/leanvm-recursion-profile $F $F out.json crates/spartan_whir_guest/profiles/terminal_c1.json
-cast call --rpc-url https://testnet-rpc.monad.xyz 0x4fa20bd740deb7969416749dbedb5d8e5b65c4be \
-  0x$(xxd -p ../../../k3/vendor/sol-spartan-whir/testdata/leanvm_terminal/KeccakPublicMemoryC1Pow28T6/calldata.bin | tr -d '\n')
+# prover (from vendor/, after cloning Client-Side-Proving/leanVM@fb0909d as leanVM and applying the patch)
+cd vendor/leanVM && git apply ../../patches/leanVM-recursive-verifier-fb0909d.patch
+cargo build --release -p spartan_whir_guest --bin sigpress-xmss-terminal     # pinned nightly-2026-03-04
+LEANVM_PROVING_TIMEOUT_SECONDS=0 LEANVM_TERMINAL_EXPORT=../../runs/n4/native /usr/bin/time -l \
+  ./target/release/sigpress-xmss-terminal 4 ../../runs/n4/report.json ../../profiles/sigpress_c1.json
+# Solidity (vendor/sol-whir-p3 = ethereum/sol-whir-p3@b82359e + patch, lib/ = forge-std + solady)
+cd ../sol-whir-p3 && git apply ../../patches/sol-whir-p3-b82359e.patch
+SIGPRESS_NO_PROVENANCE=1 PYTHONPATH=../../tools python3 script/generate_leanvm_two_commitment_terminal_fixture.py \
+  ../../runs/n4/native/root-fixture.json SigpressXmssC1N4
+forge build --offline src/leanvm/generated/LeanVmTwoCommitmentTerminal_SigpressXmssC1N4.sol \
+  test/LeanVmTwoCommitmentTerminal_SigpressXmssC1N4.t.sol
+forge test --offline --isolate --threads 1 --match-contract LeanVmTwoCommitmentTerminal_SigpressXmssC1N4Test
+# chain (gate: cd ../../gate && forge build)
+python3 -I tools/app_root.py runs/n4
+RPC=http://127.0.0.1:8551 PK=<anvil key> tools/gate_flow.sh runs/n4 SigpressXmssC1N4
+# one verifier for many N: pad the child to the 2x256 shape, then eth_call the 2x256 verifier
+# SIGPRESS_MIN_LOG_ROWS=18,13,16 ./target/release/sigpress-xmss-terminal 4 ...
+RPC=https://testnet-rpc.monad.xyz PK=$PRIVATE_KEY_K4 SKIP_VERIFY_TX=1 tools/gate_flow.sh runs/n4 SigpressXmssC1N4
 ```
 
-| Step | Result (measured here) |
-|---|---|
-| Build | OK, 1 min 05 s |
-| `smoke-control`: control Spartan-WHIR guest -> lift -> binary node (Poseidon, **not** the Keccak terminal) | passed native verification; mutated application digest and root rejected. Child prove 0.62 s, lift 0.74 s, node 1.51 s; lift proof 266,961 B, node proof 275,562 B; 5.74 s wall, 1.46 GB max RSS. `results/smoke-control.json` |
-| `terminal_hash_profiles` test: prove + verify a toy program under the **Keccak240** terminal hash profile, reject wrong hash/profile/bytecode/input | 1 passed (`results/terminal-hash-profiles.txt`) |
-| Full terminal runner with the one checked-in client fixture used twice | refused: "use two distinct application statements for the binary experiment". A second client fixture needs `ethereum/spartan-whir` (no LICENSE; Circom withdrawal circuit) — not attempted in the time box |
-| Deployed verifier, `eth_call` with the K3 fixture | still returns `true` |
+## Next steps
 
-We did **not** produce a terminal proof, and did not check any new proof against the deployed
-contract: per the version analysis above, it would be rejected.
+1. Fund the wallet (~2.8 MON) and deploy the 2 x 256 (or a larger fixed-shape) verifier on Monad;
+   submit a padded small batch and a full batch to the same contract.
+2. Bind batch root -> applicationRoot on chain (Poseidon1 in Solidity, or a Keccak digest exposed by the
+   root program), then drop the registrar.
+3. Per-user messages: multi-message aggregation as the child, or a guest that verifies (pubkey, userOpHash)
+   pairs and outputs their Keccak root.
+4. Find the per-leaf cap (K5 saw one binary-field leaf top out between 2,048 and 4,096 signatures; this
+   KoalaBear branch is unmeasured beyond 256 per child).
 
-## Search log (where we looked)
+## Earlier search (how we found the prover)
 
-- `alxkzmn` repos (`gh api users/alxkzmn/repos`): forks `alxkzmn/leanVM` (branches `main`,
-  `blake3-precompile`, `whir-based`) and `alxkzmn/leanVM-b` (40+ binary-field branches); no terminal code
-  on branch names checked.
-- `leanEthereum/leanVM` (= the renamed leanMultisig): 180+ branches, `koalabear` branch cloned
-  (`1594657`, has `python-verifier`, no Keccak/terminal code); tags v0.8-v0.10.
-- `gh search code` for fixture identifiers (`leanvm-terminal-two-commitment-fixture-v1`,
-  `leanvm-keccak240-v1`, `verifyC1V1`): only `ethereum/sol-whir-p3` (code search only indexes default
-  branches, which is why the prover branch did not show up).
-- `gh search commits --author alxkzmn`: led to `ethereum/spartan-whir` PR #5 "Prepare Spartan-WHIR
-  proofs for recursive verification in LeanVM-a" and to the `Client-Side-Proving` org, whose
-  `leanVM` fork has the `recursive-verifier` branch.
-- Inside `experiments/k3/vendor/sol-spartan-whir`: `AGENTS.md`, README and the generator reference
-  `../leanVM/benchmark-results/terminal-c1-b-threshold6-pow28/native/root-fixture.json` and
-  `../leanVM/crates/lean_prover/python-verifier`; the manifest has `native_proof_sha256` but no source
-  commit hash.
+The prover is the `recursive-verifier` branch of
+[Client-Side-Proving/leanVM](https://github.com/Client-Side-Proving/leanVM/tree/recursive-verifier)
+(`fb0909d`, Alex Kuzmin, 15 Oct 2026, Apache-2.0). GitHub code search misses it (default branches only);
+found via `gh search commits --author alxkzmn` -> `ethereum/spartan-whir` PR #5 -> the
+`Client-Side-Proving` org. The verifier we deployed in K4 (sol-spartan-whir `18eda72`) uses profile tag
+`0x57500001`; the prover now uses `0x57500002` (WHIR continuation-claim correction), so it cannot accept
+new proofs: we generate a fresh verifier per chain instead, as above. Also run here: the authors'
+`smoke-control` chain (`results/smoke-control.json`) and the Keccak240 profile test
+(`results/terminal-hash-profiles.txt`).
 
-## Licences (checked 4 Nov 2026)
+## Licences
 
-| Repo | Licence |
-|---|---|
-| Client-Side-Proving/leanVM (`recursive-verifier`) | Apache-2.0 (`LICENSE` file) — reusable |
-| leanEthereum/leanVM | MIT + Apache-2.0 — reusable |
-| ethereum/sol-whir-p3, alxkzmn/sol-spartan-whir | **no LICENSE file** (SPDX headers + README say MIT) — research only |
-| ethereum/spartan-whir, Client-Side-Proving/spartan-whir-export | **no LICENSE file** — research only |
-
-So the prover side is clean to reuse; the Solidity verifier still is not, until a LICENSE file appears.
-
-## Next step
-
-Build the shortest real chain on this branch: a small leanVM XMSS aggregate (e.g. 2 aggregates of a
-few signatures) as the child program -> `lift` -> `prove_terminal_binary_node_c1_v1_with_preprocessing`
-with `terminal_keccak`, export `root-fixture.json` in the same schema the recursion-profile binary
-writes, generate a C1 verifier with `ethereum/sol-whir-p3`'s generator (tag `0x57500002`), and verify on
-anvil, then Monad testnet. Effort (estimate, not measured): 1-2 weeks if the profile mismatch is just
-plumbing; more if the 16 GB machine cannot hold the chain (rent a 64 GB box).
+| Repo | Licence | Use here |
+|---|---|---|
+| Client-Side-Proving/leanVM `recursive-verifier` | Apache-2.0 (LICENSE file) | base of our patch; reusable |
+| ethereum/sol-whir-p3 | no LICENSE file; sources `SPDX-License-Identifier: MIT` | generator + Solidity verifier, research only |
+| ethereum/spartan-whir | no LICENSE file | not used |
+| ours: `tools/`, `gate/` | MIT | |
