@@ -156,7 +156,10 @@ flowchart LR
    chain; on a throughput chain that's the binding constraint, which is exactly what aggregation removes.
 2. **The verifier fits *and* is cheap (measured).** Our STARK verifier is **62.7 KB: it deploys under
    Monad's 128 KB limit but would *not* fit Ethereum's 24 KB**, and a proof verifies for **~12.84M gas**
-   (Monad gives 30M gas *per tx*; Ethereum gives 30M per *block*).
+   (Monad gives 30M gas *per tx*; Ethereum gives 30M per *block*). It's live on Monad testnet at
+   [`0x4fa20bd7…c4be`](https://testnet.monadexplorer.com/address/0x4fa20bd740deb7969416749dbedb5d8e5b65c4be)
+   ([verify tx, ~12.84M gas](https://testnet.monadexplorer.com/tx/0x3ab6054a444f6f52bc4054ccbfc2b621dfc91564ba324de62c4ab9cc8fec968c));
+   it is generated `sol-spartan-whir` code, so it shows as unverified bytecode on the explorer.
 3. **The rails and the gap are already here.** ERC-4337, EIP-7702 and a P-256 precompile are deployed, and
    Monad's roadmap leaves the size question open. We ship it at the **app layer, today.**
 

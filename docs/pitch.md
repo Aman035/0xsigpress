@@ -107,7 +107,10 @@ Three reasons, each now backed by a measurement, not a claim:
    deploys under Monad's **128 KB** contract limit ([MIP-2](https://mips.monad.xyz/MIPs/MIP-2)) but
    **would not deploy on Ethereum** (24 KB). Verifying a proof cost **~12.84M gas** in one transaction on
    Monad testnet — Monad gives **30M gas per transaction** (Ethereum: 30M per *block*), so it's cents
-   here and tens of dollars, if it fit at all, on Ethereum mainnet.
+   here and tens of dollars, if it fit at all, on Ethereum mainnet. The deployed verifier is
+   `0x4fa20bd740deb7969416749dbedb5d8e5b65c4be` (verify tx
+   `0x3ab6054a444f6f52bc4054ccbfc2b621dfc91564ba324de62c4ab9cc8fec968c`); it is generated
+   `sol-spartan-whir` code, unverified on the explorer.
 3. **The rails and the gap are already on Monad.** ERC-4337 EntryPoints (v0.6–v0.8), EIP-7702 and a P-256
    precompile are deployed, so the aggregator plugs in with no fork. Monad has publicly committed to a PQ
    roadmap that leaves the size question open. The design we implement,
