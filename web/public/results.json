@@ -5,15 +5,15 @@
     "calldataBytes": 2276
   },
   "batch": {
-    "txHash": "0x70a8abeae972c1ddc4e9455c56de51166efe8200a1e9702784328754da803c0b",
-    "gasUsed": 133658,
+    "txHash": "0x542a11169ccce2fba5c60edc286b9b0689f8b787eb7f9db965903ff8b7531a8d",
+    "gasUsed": 111469,
     "count": 256,
-    "root": "0x29b9a85ed0eefa20adb9d61a6ac2072a31e05edee947fca15a88dedf46f6a061",
+    "root": "0xd17204eae82d2362fa54e83998cb55669eb567ff599f7249369910b797413224",
     "bytesPerOp": 0.890625
   },
   "tamper": {
-    "submitTx": "0xb041d1a1608822b80a52346b36c76235741e9894d809f749e864ea5cfc0c42b8",
-    "challengeTx": "0x491ef40b727aaa0a13d3e093eb0d073b496b2d3da689156705ba09ae6d234ce0",
+    "submitTx": "0x68f96f0f110b951cc733948b9e99ec230c100c6a8e2fb9a10e2a4d1ad928d0d6",
+    "challengeTx": "0xbbf16f26cfa34d339cbe62519d603b968697f5044a93f7ed517536d41eee2a38",
     "slashed": true
   },
   "execute": {
@@ -49,48 +49,82 @@
     "directGas": 193142
   },
   "stage": {
-    "startedAt": "2026-11-04T09:44:18.380Z",
+    "startedAt": "2026-11-04T12:02:15.817Z",
     "n": 256,
     "chainId": 10143,
-    "account": "0xf379767970946d94cea9866Bd581d10b1fe02311",
+    "account": "0x8bbF11e30b9447BEadE182994e116a53C15B47FB",
     "batch": {
-      "txHash": "0xe225986bb088f07e1cd63e6ee95c63cc7df83dd8056018cdaafdf2d7ede07098",
-      "batchId": 16,
-      "gasUsed": 110494,
+      "txHash": "0x542a11169ccce2fba5c60edc286b9b0689f8b787eb7f9db965903ff8b7531a8d",
+      "batchId": 6,
+      "gasUsed": 111469,
       "inputBytes": 228,
       "bytesPerOp": 0.890625,
-      "signMs": 3690,
-      "confirmMs": 1522,
-      "at": "2026-11-04T09:44:23.983Z"
+      "signMs": 3642,
+      "confirmMs": 647,
+      "at": "2026-11-04T12:02:20.702Z"
     },
     "comparison": {
-      "naiveTx": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
+      "naiveTx": "0xf026c92c2db1246fb8ebd0e9f9966a17865aee2feebedcb4adde956d23666ca6",
       "naiveFresh": false,
       "naiveBytesPerOp": 2276,
-      "naiveGasPerOp": 143278,
+      "naiveGasPerOp": 147218,
       "batchBytesPerOp": 0.890625,
-      "batchGasPerOp": 431.6171875,
-      "at": "2026-11-04T09:44:23.986Z"
+      "batchGasPerOp": 435.42578125,
+      "at": "2026-11-04T12:02:20.704Z"
     },
     "tamper": {
-      "submitTx": "0xb866f8688041568a9ef694296302491e9558fd47c0a91d468e0441c4be95e62c",
-      "challengeTx": "0x7dae037aaa41696b8d2053b0fd333f35b4f107c966b81362b4d5197d61e873d8",
-      "batchId": 17,
+      "submitTx": "0x68f96f0f110b951cc733948b9e99ec230c100c6a8e2fb9a10e2a4d1ad928d0d6",
+      "challengeTx": "0xbbf16f26cfa34d339cbe62519d603b968697f5044a93f7ed517536d41eee2a38",
+      "batchId": 7,
       "badIndex": 7,
       "slashed": true,
-      "challengeGas": 211242,
-      "checkMs": 46,
-      "at": "2026-11-04T09:44:29.699Z"
+      "challengeGas": 400000,
+      "checkMs": 52,
+      "at": "2026-11-04T12:02:27.787Z"
     },
     "validity": {
-      "txHash": "0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1",
-      "gasCharged": 12788255,
-      "signatures": 512,
-      "proofDir": "out/validity/2026-11-04T09-42-32-561Z-2x256-n256",
-      "tamperReason": "MERKLE_ROOT",
-      "at": "2026-11-04T09:44:33.646Z"
+      "txHash": "0xe68e9e3802e2caf5c929f28f55e1478867a321020372c88afe7ace910c184907",
+      "gasCharged": 22205110,
+      "gasPerSig": 10842,
+      "bytesPerSig": 116.2,
+      "signatures": 2048,
+      "shape": "2x1024",
+      "proofDir": "out/validity/2026-11-04T11-54-30-734Z-v2-2x1024-sdk",
+      "negatives": [
+        {
+          "name": "tampered-proof",
+          "reverted": true,
+          "reason": "MERKLE_ROOT"
+        },
+        {
+          "name": "wrong-message",
+          "reverted": true,
+          "reason": "RootMismatch"
+        },
+        {
+          "name": "wrong-signer",
+          "reverted": true,
+          "reason": "RootMismatch"
+        },
+        {
+          "name": "swap-batches",
+          "reverted": true,
+          "reason": "RootMismatch"
+        },
+        {
+          "name": "wrong-slot",
+          "reverted": true,
+          "reason": "RootMismatch"
+        },
+        {
+          "name": "replay",
+          "reverted": true,
+          "reason": "AlreadyAccepted"
+        }
+      ],
+      "at": "2026-11-04T12:02:36.434Z"
     },
-    "finishedAt": "2026-11-04T09:44:33.648Z"
+    "finishedAt": "2026-11-04T12:02:36.437Z"
   },
   "compact": {
     "txHash": "0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd",
@@ -100,40 +134,79 @@
     "gasPerOp": 27184
   },
   "validity": {
-    "txHash": "0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1",
-    "gasEstimate": 12179291,
-    "gasCharged": 12788255,
-    "calldataBytes": 106340,
+    "txHash": "0x58793519fb294680ecd1b69dffe26580bc59e3ac5ddb4c28ceaec1396de99f7b",
+    "gasEstimate": 14968702,
+    "gasCharged": 15717137,
+    "calldataBytes": 139844,
     "signatures": 512,
     "perChild": 256,
-    "gasPerSignature": 24977,
-    "bytesPerSignature": 207.7,
-    "proofBytes": 110533,
-    "verifyCalldataBytes": 106276,
-    "proveSeconds": 60.6,
-    "verifier": "0xf563BB0b43d6090C89D45a7A780c8AB0175d92d2",
-    "gate": "0xE2BFD06CC8677df23909dD4ee801b2A9D286f119",
+    "gasPerSig": 30698,
+    "bytesPerSig": 273.1,
+    "proveSeconds": 50.9,
+    "leanvmProvingSeconds": 44.4,
+    "maxRssBytes": 6021971968,
+    "proofBytes": 111019,
+    "verifyCalldataBytes": 106660,
+    "gate": "0x38EEb174D437c038DD16Ca91e682f24cDc71c697",
+    "verifier": "0xa43f61c3936DC4D22B471594F99A33EADc7c4ABb",
     "shape": "2x256",
-    "leftBatchRoot": "0xd20ce22bd80db78db917ba5f555476a1b9957b3471a722c1100d6d370f9ad4d4",
-    "rightBatchRoot": "0xe720ec1b16c4be02cd92f5ce783e2c4fdb2b420dc82b2d163bfe33236ee95eb7",
-    "registerTx": "0xed7516c3f47833ac5f3cdbfea7a9236a09b96536eb12ad1714a31f601c7b5c27",
+    "slot": 3,
+    "commitment": "0x0c30dc976d26c3ed10ce0e19ccc5d07e0f1dfdf961a4773030c9d286efb7ecc4",
+    "distinctMessages": true,
+    "source": "sdk",
     "accepted": true,
-    "tamper": {
-      "flippedByte": 60000,
-      "reverted": true,
-      "reason": "MERKLE_ROOT"
-    },
-    "provedAt": "2026-11-04T09:44:13.717Z",
-    "replay": false,
-    "at": "2026-11-04T09:44:33.646Z",
-    "notBound": [
-      "batch root -> applicationRoot is registered by a trusted registrar (recomputed off chain, not by the contract)",
-      "signer set is inside the proof's digest; the contract never sees the public keys",
-      "one shared 32-byte message per child batch, not per-user ops; exactly two children",
-      "KoalaBear/Poseidon leanXMSS with deterministic test keys, not our WOTS.sol accounts",
-      "security = the authors' 100-bit component targets; full-chain composition not analysed"
+    "negatives": [
+      {
+        "name": "tampered-proof",
+        "reverted": true,
+        "reason": "MERKLE_ROOT"
+      },
+      {
+        "name": "wrong-message",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "wrong-signer",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "swap-batches",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "wrong-slot",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "replay",
+        "reverted": true,
+        "reason": "AlreadyAccepted"
+      }
     ],
-    "proofDir": "out/validity/2026-11-04T09-42-32-561Z-2x256-n256"
+    "provedAt": "2026-11-04T11:33:48.806Z",
+    "at": "2026-11-04T11:52:07.911Z",
+    "notBound": [
+      "account <-> pubkey: the gate binds pubkeys and messages, not Ethereum accounts (ValidityEntry adds a self-set account -> pubkey registry)",
+      "one verifier per batch shape (2 x 256, 2 x 1024); smaller batches are padded with filler signers",
+      "the polynomial-binding soundness argument (Schwartz-Zippel over F_p^5, keccak challenge) is ours and not externally reviewed",
+      "one slot per proof, exactly two batches; KoalaBear/Poseidon leanXMSS keys, not our WOTS.sol accounts",
+      "security = the leanVM authors' 100-bit component targets; full-chain composition not analysed"
+    ],
+    "proofDir": "out/validity/2026-11-04T11-32-18-155Z-v2-2x256-sdk",
+    "sdk": {
+      "keygenMsTotal": 1544,
+      "signMsTotal": 26297,
+      "batchBytes": [
+        664454,
+        664454
+      ],
+      "messages": "ValidityEntry.opHash of a synthetic op per user (undeployed account derived from its key)"
+    },
+    "explorerTx": "https://testnet.monadexplorer.com/tx/0x58793519fb294680ecd1b69dffe26580bc59e3ac5ddb4c28ceaec1396de99f7b"
   },
   "validitySdk": {
     "txHash": "0x08957c47f9638ad29a3ebff6f2b6de1fd7e80562388cde8500a42919940f152d",
@@ -186,5 +259,70 @@
     "leanvmProvingSeconds": 47.6,
     "maxRssBytes": 5602885632,
     "proofDir": "out/validity/2026-11-04T10-24-53-871Z-2x256-n16-sdk"
+  },
+  "validityStage": {
+    "txHash": "0xe68e9e3802e2caf5c929f28f55e1478867a321020372c88afe7ace910c184907",
+    "gasEstimate": 21147724,
+    "gasCharged": 22205110,
+    "calldataBytes": 238052,
+    "signatures": 2048,
+    "perChild": 1024,
+    "gasPerSig": 10842,
+    "bytesPerSig": 116.2,
+    "proveSeconds": 62.1,
+    "leanvmProvingSeconds": 54.5,
+    "maxRssBytes": 5741674496,
+    "proofBytes": 111501,
+    "verifyCalldataBytes": 106564,
+    "gate": "0x5648Caea56baa011b6685Ce091089B561621a661",
+    "verifier": "0xC6304db43e642c0bC43b55f13a3Ebe21F336794f",
+    "shape": "2x1024",
+    "slot": 3,
+    "commitment": "0xca0721e10e8a4412a33771a0027378fb2cbe2bdb7dbab8d8006d47d422213775",
+    "distinctMessages": true,
+    "source": "sdk",
+    "accepted": true,
+    "negatives": [
+      {
+        "name": "tampered-proof",
+        "reverted": true,
+        "reason": "MERKLE_ROOT"
+      },
+      {
+        "name": "wrong-message",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "wrong-signer",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "swap-batches",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "wrong-slot",
+        "reverted": true,
+        "reason": "RootMismatch"
+      },
+      {
+        "name": "replay",
+        "reverted": true,
+        "reason": "AlreadyAccepted"
+      }
+    ],
+    "provedAt": "2026-11-04T11:58:09.539Z",
+    "at": "2026-11-04T12:02:36.434Z",
+    "notBound": [
+      "account <-> pubkey: the gate binds pubkeys and messages, not Ethereum accounts (ValidityEntry adds a self-set account -> pubkey registry)",
+      "one verifier per batch shape (2 x 256, 2 x 1024); smaller batches are padded with filler signers",
+      "the polynomial-binding soundness argument (Schwartz-Zippel over F_p^5, keccak challenge) is ours and not externally reviewed",
+      "one slot per proof, exactly two batches; KoalaBear/Poseidon leanXMSS keys, not our WOTS.sol accounts",
+      "security = the leanVM authors' 100-bit component targets; full-chain composition not analysed"
+    ],
+    "proofDir": "out/validity/2026-11-04T11-54-30-734Z-v2-2x1024-sdk"
   }
 }

@@ -104,6 +104,14 @@
   .limits li::before { content:""; position:absolute; left:0; top:9px; width:7px; height:7px; border:1.5px solid var(--dim); border-radius:1px; }
   .cred { font-size:15px; color:var(--dim); max-width:66ch; } .cred b { color:var(--ink); font-weight:600; }
 
+  .vgrid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+  .vcell { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+  .vcell b { display:block; font:700 clamp(20px,3.4vw,30px)/1.1 var(--mono); color:var(--purple); letter-spacing:-0.02em; overflow-wrap:anywhere; }
+  .vcell span { display:block; color:var(--dim); font-size:13px; margin-top:6px; }
+  .vline { font-size:15px; color:var(--dim); max-width:72ch; margin:0; }
+  .vline b { color:var(--ink); font-weight:600; }
+  @media (max-width:720px){ .vgrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
   footer { padding:34px 0 56px; border-top:1px solid var(--line); color:var(--dim); font-size:13px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
 </style>
 </head>
@@ -121,6 +129,15 @@
     block capacity by up to 90%. <b>Sigpress puts one hash-based proof on chain instead of the
     signatures</b> — 98 bytes per operation instead of 2,276. Run it below.</p>
   </div>
+
+  <section id="validity">
+    <h2>Validity proof</h2>
+    <p class="lead wide">One STARK proves every post-quantum signature in the batch. One Monad transaction
+    checks it. Nobody has to be trusted.</p>
+    <div class="vgrid" id="vgrid"></div>
+    <p class="vline" id="vline"></p>
+    <ul class="limits" id="vlimits" style="margin-top:20px"></ul>
+  </section>
 
   <section id="run">
     <h2>Live run</h2>
@@ -150,8 +167,8 @@
 
   <section>
     <h2>Where it stands</h2>
-    <p class="lead wide">The validity proof runs end to end on our own signatures, and now binds
-    trustlessly. What's left is scale and production fit.</p>
+    <p class="lead wide">The validity proof runs end to end on our own signatures and binds
+    trustlessly. What's left is production fit.</p>
     <ul class="limits" id="limits"></ul>
     <p class="cred" style="margin-top:26px"><b>Credit:</b> the aggregation idea is EIP-8288's
     (Buterin &amp; Coratger), proposed for Ethereum's protocol and not working anywhere yet. Sigpress is a
@@ -171,7 +188,8 @@ const FALLBACK_RES = {
   naive:{ txHash:"", gasUsed:143278, calldataBytes:2276 },
   batch:{ txHash:"", gasUsed:110494, count:256, bytesPerOp:0.890625 },
   compact:{ txHash:"", count:128, bytesPerOp:98, gasPerOp:27184 },
-  validity:{ txHash:"", gasCharged:12788255, signatures:512, gasPerSignature:24977, bytesPerSignature:207.7 },
+  validity:{ txHash:"0x58793519fb294680ecd1b69dffe26580bc59e3ac5ddb4c28ceaec1396de99f7b", gasCharged:15717137, signatures:512, gasPerSig:30698, bytesPerSig:273.1, calldataBytes:139844, shape:"2x256" },
+  validityStage:{ txHash:"0x97e2a519475fbe284637707e0682f5e8e882bf2dfb2f96f4099766e7472a2ec1", gasCharged:23188637, signatures:2048, gasPerSig:11323, bytesPerSig:116.2, calldataBytes:237956, shape:"2x1024" },
   tamper:{ submitTx:"", challengeTx:"", slashed:true },
   execute:{ gasPerExecute:134634 }
 };
@@ -193,7 +211,7 @@ function stepsFromResults(res){
   const s = res.stage || {};
   const b = s.batch || res.batch || {};
   const t = s.tamper || res.tamper || {};
-  const v = s.validity || res.validity || {};
+  const v = s.validity || res.validityStage || res.validity || {};
   const naiveBpo = (s.comparison?.naiveBytesPerOp) ?? res.naive?.calldataBytes ?? 2276;
   return [
     { key:"sign",  lab:"Sign 256 post-quantum operations",
@@ -209,7 +227,7 @@ function stepsFromResults(res){
       det:`<span class="slash">bond slashed, batch rejected</span>`, tx:t.challengeTx,
       ms:Math.min((t.checkMs??46)+1500, 2600), fail:true },
     { key:"val",   lab:"Verify the STARK proof of all signatures",
-      det:`${fmt(v.signatures??512)} sigs · ${gm(v.gasCharged??12788255)} gas · one tx; tampered proof reverts`,
+      det:`${fmt(v.signatures??2048)} sigs, each over its own message · ${gm(v.gasCharged??23188637)} gas · one tx; tampered proof reverts`,
       tx:v.txHash, ms:2200 },
   ];
 }
@@ -298,19 +316,40 @@ function paintStatic(res){
   const L = [
     { m:"Naive PQ operation", s:"one WOTS signature verified fully on chain", v:fmt(res.naive?.calldataBytes||2276)+" B", g:fmt(res.naive?.gasUsed)+" gas", tx:res.naive?.txHash },
     { m:"Compact bundle", s:(res.compact?.count??128)+" operations executed in one transaction", v:fmt(res.compact?.bytesPerOp)+" B/op", g:res.compact?.gasPerOp?fmt(res.compact.gasPerOp)+" gas/op":"", tx:res.compact?.txHash, hi:true },
-    { m:"Validity proof on our signatures", s:(res.validity?.signatures??512)+" leanXMSS signatures recursed to a Keccak terminal proof, verified in one transaction", v:(res.validity?.bytesPerSignature??207.7)+" B/sig", g:fmt(res.validity?.gasPerSignature)+" gas/sig, "+gm(res.validity?.gasCharged||12788255)+" gas total", tx:res.validity?.txHash, hi:true },
+    ...[res.validityStage || FALLBACK_RES.validityStage, res.validity].filter(x=>x&&x.txHash).map(x=>({ m:"Validity proof, "+fmt(x.signatures)+" signers", s:"leanXMSS signatures, each over its own message, in one STARK; the contract binds every key and message, no registrar", v:x.bytesPerSig+" B/sig", g:fmt(x.gasPerSig)+" gas/sig, "+gm(x.gasCharged)+" gas total", tx:x.txHash, hi:true })),
   ];
   document.getElementById("ledger").innerHTML = L.map(x=>`<div class="row ${x.hi?"hi":""}">
     <div class="metric">${x.m}<small>${x.s}</small></div>
     <div class="val">${x.v}${x.g?`<span class="sec">${x.g}</span>`:""}${x.tx?`<a class="proof" href="${EX}/tx/${x.tx}" target="_blank" rel="noopener">${shortHash(x.tx)}</a>`:`<span class="proof" style="color:var(--dim)">run the demo</span>`}</div></div>`).join("");
 
   const limits = [
-    "Binding is now trustless: the contract recomputes the batch from the signers and their per-operation messages on chain, no trusted helper.",
-    "The on-chain binding hash is still expensive, so about 105 signers fit in one transaction today.",
-    "The prototype uses a research key format, not our production post-quantum accounts yet.",
-    "Proving a batch takes about a minute, so the live product path stays the optimistic one for now."
+    "The STARK path is the headline; the optimistic path (bonded challenge) stays as the fallback and runs the live demo above.",
+    "Proving a batch takes about a minute on a laptop, so the stage submits a proof built beforehand.",
+    "The prototype uses a research key format (leanXMSS over KoalaBear), not our production post-quantum accounts yet."
   ];
   document.getElementById("limits").innerHTML = limits.map(t=>`<li>${t}</li>`).join("");
+}
+
+/* ---------- validity panel (first section) ---------- */
+function paintValidity(res){
+  // The 2 x 1024 headline: the stage's Beat 5 run if recorded, else the measured binding-v2 run (README tx).
+  const v = (res.validityStage && res.validityStage.txHash) ? res.validityStage : FALLBACK_RES.validityStage;
+  const cells = [
+    [fmt(v.signatures), "post-quantum signers, each over its own message"],
+    ["1", "Monad transaction ("+gm(v.gasCharged)+" gas charged)"],
+    [fmt(v.gasPerSig), "gas per signature"],
+    [v.bytesPerSig+" B", "calldata per signature"],
+  ];
+  document.getElementById("vgrid").innerHTML = cells.map(([b,t])=>`<div class="vcell"><b>${b}</b><span>${t}</span></div>`).join("");
+  document.getElementById("vline").innerHTML = `Measured on Monad testnet: <b>${fmt(v.calldataBytes)} B</b> of calldata in one tx,
+    the Solidity verifier runs the full STARK check, and the contract recomputes the proof's statement from every
+    public key and message. A tampered proof, a changed message or swapped batches all revert. ${txA(v.txHash) ? "Transaction "+txA(v.txHash)+"." : ""}`;
+  const caveats = [
+    "The contract binds public keys and messages, not Ethereum accounts: our ValidityEntry adds a registry (each account sets its key once, at creation).",
+    "One generated verifier per batch shape (2 × 256 and 2 × 1024 deployed); smaller batches are padded with filler signers.",
+    "The cheap binding (a keccak challenge and a polynomial check) is our own soundness argument and has not been reviewed by anyone else.",
+  ];
+  document.getElementById("vlimits").innerHTML = caveats.map(t=>`<li>${t}</li>`).join("");
 }
 
 (async function(){
@@ -322,6 +361,7 @@ function paintStatic(res){
   const steps = stepsFromResults(res);
   renderSteps(steps, { active:-1, done:new Set() });
   document.getElementById("runBtn").addEventListener("click", ()=>runReplay(stepsFromResults(res)));
+  paintValidity(res);
   paintStatic(res);
   pollLive(); // if a local runner is writing public/progress.json, switch to the real on-chain run
 })();
