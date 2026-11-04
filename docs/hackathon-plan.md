@@ -123,3 +123,12 @@ Repo layout:
 - Never commit `.env` or keys.
 - Every number on the page or in the pitch is either measured (with a tx hash) or labelled as a model/sample.
 - Only MIT/Apache-2.0 code. The WOTS and contracts are written by us today.
+
+## Phase 2 (in progress, Sumith)
+
+- [x] Core contracts + TS, tests green (forge 20/20, TS 11/11), TS ↔ Solidity vector match
+- [x] One-shot testnet run: `./scripts/testnet.sh` (needs funded `PRIVATE_KEY` in `.env`)
+- [ ] Fund deployer `0x445a0c4780a8107158df60B18Ee5372497dc1D12` from the faucet, run testnet script
+- [ ] `PQAccount` + factory: accounts execute ops only from finalized batches (key rotates each op); `executeDirect` single-op fallback; `pnpm execute` script
+- [ ] K3: proof-system survey in `experiments/k3/`, local K4 data point (Solidity STARK/WHIR verifier gas on anvil)
+- [ ] Testnet numbers into `docs/decisions.md` and `web/public/results.json` (Aman wires them into the page)
