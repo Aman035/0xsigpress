@@ -162,6 +162,90 @@ anvil (`aggregator/test/sdk-anvil.test.ts`), full tx `gasUsed`, h = 4: `executeD
 Monad charges gas on the gas *limit*, not on gas used, so real cost depends on the limit the sender sets.
 None of these are testnet numbers yet.
 
+## leanXMSS (for validity proofs)
+
+Added 4 Nov 2026 (K11, `experiments/k11-leanxmss/`). Research-grade, local only.
+
+The K10 STARK chain (leanVM `recursive-verifier` @ `fb0909d`, Apache-2.0) only accepts **leanXMSS over
+KoalaBear with Poseidon1**. That is a different scheme from the Keccak WOTS/XMSS above: different hash, field,
+encoding and key format. A key from one scheme can't sign for the other. `aggregator/src/sdk/leanxmss.ts` wraps a
+Rust CLI (`experiments/k11-leanxmss/signer`) that calls the vendored `xmss` crate directly, so its signatures
+are exactly what the leanVM aggregation program verifies.
+
+### Which scheme when
+
+| | Keccak XMSS (`xmss.ts`) | leanXMSS (`leanxmss.ts`) |
+|---|---|---|
+| Verified by | Solidity (`XMSS.sol`, `XMSSAccount`), optimistic batch path | the leanVM aggregation program, and so the K10 terminal proof verified on chain |
+| Use for | direct ops and the optimistic aggregator | validity-proof batches |
+| Message model | each op signs its own message | **every signer in a batch signs the same 32-byte message at the same slot** (single-message aggregation) |
+| Public key / signature | 32 B root / 2,528 B at h = 10 | 32 B / 1,208 B (any key size) |
+| Runs in | pure TS | needs the Rust binary (`SIGPRESS_LEANXMSS_BIN`) |
+
+So today a leanXMSS batch commits a set of signers to one shared 32-byte root (e.g. a batch root). Per-user
+messages (one userOp per signer) need multi-message aggregation or a different guest. That isn't built (K10
+README, "What the proof binds").
+
+### Using it
+
+```ts
+import { createLeanXmssKeyStore, leanxmssKeygen, leanxmssSign, leanxmssVerify, leanxmssExportBatch } from "./src/sdk/leanxmss.ts";
+
+const key = leanxmssKeygen(seed, "./keys/lx.json", { logSlots: 10 });  // key file holds the seed (0600)
+const ks = createLeanXmssKeyStore("./keys/lx.state.json", key);        // later: KeyStore.open(path)
+const sig = leanxmssSign(key, ks, batchRoot, { slot: 7 });               // the aggregator picks the slot
+leanxmssVerify(key.publicKey, sig.slot, batchRoot, sig.signature);       // true
+leanxmssExportBatch([sig /*, other signers' sigs over the same (batchRoot, 7) */], "./batch.json");
+ks.close();
+```
+
+Build the binary first: `cd experiments/k11-leanxmss/signer && cargo build --release -j 4`. It needs the K10
+vendor checkout (`experiments/k10-terminal/vendor/leanVM` with the K10 patch) and the pinned nightly. The batch
+file feeds `sigpress-leanxmss prove-batch` (one leanVM aggregation proof plus a native verify) or
+`sigpress-leanxmss-terminal` (the full K10 chain).
+
+### Key state
+
+- A slot is the leanXMSS one-time index. KeyStore index i = slot `activationSlot + i`. The state file is the
+  normal KeyStore file, `{version, root = public key, height = logSlots, nextIndex}`. All the rules above apply.
+- `leanxmssSign` calls `KeyStore.reserveIndex` (persisted before signing), then runs the CLI with `--reserved`.
+  The CLI checks that our process holds the state lock and that the index is the one just reserved. Before
+  signing, it also durably writes the last `(index, message)` to `<state>.leanxmss-signed` and refuses an older
+  index, or the same index with a different message.
+- Signing at a given `slot` burns every unused slot below it, one durable write each. A slot at or below a used one
+  is refused. Slots only go forward, so a signer that misses a batch loses those slots.
+- The CLI can also sign without TS (`sign` without `--reserved`). It takes the same lock file itself.
+
+### Sizes and times (measured, Apple M4, shared busy machine, single runs)
+
+| logSlots (signatures) | keygen | key file | sign (CLI call) |
+|---|---|---|---|
+| 4 (16) | 2-6 ms | 1.8 KB | ~54 ms |
+| 10 (1,024) | 65-73 ms | 3.8 KB | ~59 ms |
+| 16 (65,536) | 4.3-4.6 s | 21 KB | ~130 ms |
+| 20 (1,048,576) | 81.6 s | 81 KB | ~0.5 s |
+
+The sign column is wall time per CLI call, including process start, key-file load and three fsyncs. The
+signature maths itself is a small part of that, but we haven't measured it separately. Verify is ~8 ms per CLI
+call. Keygen uses all cores. The CLI caps `logSlots` at 24 (not measured above 20).
+
+Prover side, 4 CLI-signed signatures (`experiments/k11-leanxmss/results/`):
+- one leanVM aggregation proof under K10's `direct` profile: 137,268-137,491 B, 0.84-1.18 s, ~0.8 GB RSS;
+  accepted by the native verifier;
+- the full K10 terminal chain from two such batches (2 x 4): proves, all five proofs verify natively, and the
+  authors' negative checks fail as they should. Terminal proof 111,170 B, 31.2 s proving, 6.1 GB max RSS;
+- a one-bit-tampered signature, or a changed batch message, makes the leanVM program fail (no proof).
+
+### Limits
+
+- Not run on chain from CLI-signed keys. We didn't generate or call a Solidity verifier for the K11 run. K10
+  did that for its own in-process test keys with the same shape.
+- The batch root isn't yet bound to the proof's application root on chain (K10's registrar gap), and neither is
+  the signer set.
+- Keys can't be rotated in place, and slots are a plain counter. The CLI is a research binary (shell-out per
+  call, no daemon). Security: leanVM's own README says the WHIR profiles are 100-bit component targets and that
+  a composition analysis is still owed.
+
 ## Tests
 
 - `forge test --match-path 'test/xmss/*'`: valid at several leaves, wrong path, index, leafPk, path length,
@@ -173,6 +257,9 @@ None of these are testnet numbers yet.
     child process is SIGKILLed mid-loop 3 times, and after each restart no released index is reused and
     every released index is below the persisted `nextIndex`. Also covers exhaustion and the reserved leaf,
     warnings, the lock, a wrong key, and corrupt state.
+  - `sdk-leanxmss` (skipped if the Rust binary isn't built): leanXMSS round trip; slot-reuse refusal in TS, the CLI
+    state file, the ledger and the `--reserved` lock check; 4 signatures exported, proved with the leanVM aggregation
+    program (under the shared prover lock) and accepted; a tampered batch fails to prove.
   - `sdk-anvil`: starts anvil and deploys with `forge create` (anvil's default key). Then: an h = 10 TS
     signature verifies through `cast call` on `XMSSAccount.verify`, the TS message matches `messageFor`, and
     the full `SigpressClient` flow runs (direct ops, replay and leaf-reuse rejected, batch submit, finalize and
