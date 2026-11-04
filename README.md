@@ -56,13 +56,11 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 
 ## What we built, live and measured on Monad testnet
 
-> **Optimistic aggregation is live today, and the STARK validity-proof chain now runs end to end:** our
-> own leanXMSS signature batches recurse through leanVM to a Keccak terminal proof, verified on Monad in
-> **one tx (~12.2M gas)**
-> ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)).
-> On-chain cost is flat in N (~208 B and ~24k gas per signature at 2 x 256, anvil). Binding to per-op
-> messages and a trustless batch link are still in progress. Every number below is measured on Monad
-> testnet; the tx links go to the explorer.
+> **Headline: 2,048 post-quantum signatures, each over its own message, verified on Monad in ONE
+> transaction by a hash-based STARK.** 23.2M gas charged, about 11.3k gas and 116 B per signature, no
+> trusted party ([tx](https://testnet.monadexplorer.com/tx/0x97e2a519475fbe284637707e0682f5e8e882bf2dfb2f96f4099766e7472a2ec1)). The contract checks the proof against the raw public keys and messages
+> in calldata. Optimistic aggregation (root, bond, challenge) is live too, as the fallback. Every number
+> below is measured on Monad testnet; the tx links go to the explorer.
 
 | | Measured on Monad testnet |
 |---|---|
@@ -73,6 +71,7 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 | 👤 PQ 4337 account executes from a finalized batch | ~134,634 gas |
 | 🔗 Standard `handleAggregatedOps` (EntryPoint v0.8) | 4-op aggregated bundle executes (828,003 gas) |
 | 🧮 **STARK verifier (hash-based, no pairings)** | deployed on Monad, **verifies a proof in one tx (~12.84M gas)**; tampered proof reverts |
+| 🧮 **2,048 signers, own messages, one tx (STARK, trustless)** | **23,188,637 gas charged, 237,956 B calldata** ([tx](https://testnet.monadexplorer.com/tx/0x97e2a519475fbe284637707e0682f5e8e882bf2dfb2f96f4099766e7472a2ec1)); tampered proof, changed signers or messages, and replay all revert |
 | 🧮 **Our own signatures through the STARK chain** | 2 x 4 leanXMSS sigs to terminal proof, **verified on Monad, one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)); tampered proof and swapped roots revert |
 | ⚙️ Prover | **1,024 signatures to 326 bytes/sig in 2.29 s** (~61 B/sig with recursion) |
 
