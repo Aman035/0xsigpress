@@ -104,7 +104,7 @@ test("anvil: SigpressClient createAccount -> signOp -> submitDirect, then batch 
   const walletClient = createWalletClient({ chain, account: privateKeyToAccount(ANVIL_KEY), transport: http(RPC) });
   const window = 60n;
   const bond = parseEther("0.01");
-  const aggregator = forgeCreate("src/OptimisticAggregator.sol:OptimisticAggregator", [bond.toString(), window.toString()]);
+  const aggregator = forgeCreate("src/OptimisticAggregator.sol:OptimisticAggregator", [bond.toString(), window.toString(), parseEther("0.001").toString(), "60"]);
   const client = new SigpressClient({ publicClient, walletClient, aggregator });
 
   const key = xmssKeygen(keccak256(toBytes("sigpress-anvil-client")), 4);

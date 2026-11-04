@@ -104,7 +104,148 @@ export const aggregatorAbi = [
     ],
   },
   { type: "event", name: "BatchFinalized", inputs: [{ name: "id", type: "uint256", indexed: true }] },
-  ...["WrongBond", "UnknownBatch", "WindowClosed", "WindowOpen", "AlreadySlashed", "AlreadyFinalized", "NotInBatch", "SignatureValid", "TransferFailed"].map(
+  // ---- data-availability challenge (SR-R1) ----
+  {
+    type: "function",
+    name: "requestReveal",
+    stateMutability: "payable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "reveal",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "index", type: "uint256" },
+      { name: "pkHash", type: "bytes32" },
+      { name: "m", type: "bytes32" },
+      { name: "sig", type: "bytes" },
+      { name: "proof", type: "bytes32[]" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "slashUnrevealed",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "reclaimDeposit",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  {
+    type: "function",
+    name: "reveals",
+    stateMutability: "view",
+    inputs: [
+      { name: "", type: "uint256" },
+      { name: "", type: "uint256" },
+    ],
+    outputs: [
+      { name: "requester", type: "address" },
+      { name: "deadline", type: "uint64" },
+      { name: "open", type: "bool" },
+    ],
+  },
+  { type: "function", name: "openReveals", stateMutability: "view", inputs: [{ name: "", type: "uint256" }], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "lastRevealDeadline", stateMutability: "view", inputs: [{ name: "", type: "uint256" }], outputs: [{ name: "", type: "uint64" }] },
+  { type: "function", name: "finalizeAt", stateMutability: "view", inputs: [{ name: "id", type: "uint256" }], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "credits", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "totalCredits", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "revealDeposit", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "revealWindow", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "BURN", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  {
+    type: "event",
+    name: "RevealRequested",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "index", type: "uint256", indexed: true },
+      { name: "requester", type: "address", indexed: true },
+      { name: "deadline", type: "uint64", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Revealed",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "index", type: "uint256", indexed: true },
+      { name: "pkHash", type: "bytes32", indexed: false },
+      { name: "m", type: "bytes32", indexed: false },
+      { name: "sig", type: "bytes", indexed: false },
+      { name: "valid", type: "bool", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "RevealMissed",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "index", type: "uint256", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "DepositReturned",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "index", type: "uint256", indexed: true },
+      { name: "requester", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "PaymentDeferred",
+    inputs: [
+      { name: "to", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Withdrawn",
+    inputs: [
+      { name: "to", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  ...[
+    "WrongBond",
+    "UnknownBatch",
+    "WindowClosed",
+    "WindowOpen",
+    "AlreadySlashed",
+    "AlreadyFinalized",
+    "NotInBatch",
+    "SignatureValid",
+    "TransferFailed",
+    "BadWindow",
+    "WrongDeposit",
+    "AlreadyRequested",
+    "NoRevealRequest",
+    "RevealExpired",
+    "RevealWindowOpen",
+    "RevealPending",
+    "NotSlashed",
+  ].map(
     (name) => ({ type: "error" as const, name, inputs: [] as const }),
   ),
 ] as const;
@@ -154,8 +295,19 @@ export const pqAccountAbi = [
       { name: "batched", type: "bool", indexed: false },
     ],
   },
+  {
+    type: "event",
+    name: "ExecutionFailed",
+    inputs: [
+      { name: "nonce", type: "uint256", indexed: true },
+      { name: "pkHash", type: "bytes32", indexed: true },
+      { name: "target", type: "address", indexed: false },
+      { name: "reason", type: "bytes", indexed: false },
+    ],
+  },
   { type: "error", name: "NotAccepted", inputs: [] },
   { type: "error", name: "InvalidSignature", inputs: [] },
+  { type: "error", name: "InsufficientGas", inputs: [] },
 ] as const;
 
 export const pqAccountFactoryAbi = [
