@@ -58,6 +58,12 @@ contract verifies it. The proof is hash-based (Keccak Merkle + Fiat–Shamir + a
 whole path is quantum-safe — **no pairings, no trusted setup, no BLS, no Groth16** (unlike the Groth16/PLONK
 SP1 gateways already on Monad, which are *not* post-quantum).
 
+**Credit where it's due:** this aggregation approach is **not ours** — Vitalik Buterin & Thomas Coratger
+proposed in-mempool PQ signature + STARK aggregation for Ethereum's protocol in
+[EIP-8288](https://eips.ethereum.org/EIPS/eip-8288) (Draft, Jun 2026). Sigpress is a working **app-layer
+implementation of that design** on the chain that needs it first, with the on-chain hash-based verifier
+EIP-8288 only specifies. We build on 8288; we don't claim the idea.
+
 ## 2. Why it's worth building
 
 **The threat is scheduled, not hypothetical.** NIST finalized the PQ signature standards in Aug 2024
@@ -103,10 +109,10 @@ Three reasons, each now backed by a measurement, not a claim:
    here and tens of dollars, if it fit at all, on Ethereum mainnet.
 3. **The rails and the gap are already on Monad.** ERC-4337 EntryPoints (v0.6–v0.8), EIP-7702 and a P-256
    precompile are deployed, so the aggregator plugs in with no fork. Monad has publicly committed to a PQ
-   roadmap that leaves the size question open. The Ethereum version of this idea,
-   [EIP-8288](https://eips.ethereum.org/EIPS/eip-8288) (Buterin & Coratger, Draft), is a *consensus-breaking
-   protocol change* that requires frame transactions (EIP-8141) and does not exist yet. We ship at the
-   **app layer, on the chain that needs it, today.** And [ERC-7766](https://eips.ethereum.org/EIPS/eip-7766)
+   roadmap that leaves the size question open. The design we implement,
+   [EIP-8288](https://eips.ethereum.org/EIPS/eip-8288) (Buterin & Coratger, Draft), targets Ethereum as a
+   *consensus-breaking protocol change* that requires frame transactions (EIP-8141) and does not exist yet.
+   We ship the same idea at the **app layer, on the chain that needs it, today.** And [ERC-7766](https://eips.ethereum.org/EIPS/eip-7766)
    (signature aggregation for 4337) was *withdrawn* for "no production adoption of aggregateable signature
    schemes" — post-quantum is that scheme.
 
@@ -137,21 +143,20 @@ Three reasons, each now backed by a measurement, not a claim:
 
 ## 5. The gap and the unknowns (said before anyone asks)
 
-**The one real gap:** the two halves of the validity path aren't joined yet. K4 verified the *authors'
-fixture* proof; K5's signature proof lives in a 192-bit binary field the EVM **cannot verify directly**
-(K6: >100M gas — the EVM has no carry-less multiply). The only EVM-viable route is to **recurse the
-signature proof down to a KoalaBear+Keccak "terminal" proof** that the deployed verifier accepts. That
-works structurally — but:
+**The chain now runs end to end on our own signatures** (K10): leanXMSS batch → leanVM → lift → Keccak
+terminal proof → **verified on Monad in one tx (~12.2M gas)**, tampered proof and swapped roots revert,
+and cost is **flat in N (~208 B, ~24k gas per signature)**. The feasibility question — "can one hash-based
+STARK prove many PQ signatures and be checked on Monad in budget?" — is answered *yes*. What remains is
+**hardening, not feasibility**:
 
-- **The terminal prover is found and licensed** (K10): `Client-Side-Proving/leanVM` branch
-  `recursive-verifier`, **Apache-2.0**; it builds and its control chain (guest → lift → node) runs. The
-  top risk — "can we even get a prover?" — is answered *yes*. Remaining: wire our own chain (small XMSS
-  aggregate → lift → Keccak terminal), **regenerate the verifier** (the deployed one pins profile tag
-  `0x57500001`; the prover now emits `0x57500002`), and bind the terminal's Poseidon1 root to our batch.
-  Estimate: **~1–2 weeks** (unmeasured).
-- **Binding + scheme alignment:** the terminal's public input must be bound to our batch root; the
-  Solidity terminal targets KoalaBear-era leanVM while leanVM main is binary-field; and our on-chain
-  scheme is WOTS, not leanXMSS. These must be reconciled.
+- **Trustless batch binding.** Today the batch-root ↔ proof link is posted by one trusted address; it
+  needs a trustless on-chain link between the proof's public input and the batch.
+- **Per-op messages.** All signers in a batch currently sign one shared message; real operations need a
+  distinct per-op message bound into the proof.
+- **Scheme alignment.** The working chain uses Poseidon-based leanXMSS, not our on-chain Keccak WOTS; the
+  two must converge.
+- **Proving speed.** The terminal proof takes ~40–58 s on a 16 GB laptop (~6 GB RSS) — longer than a
+  block, so batches span blocks or need better hardware.
 - **K9 (bytes/op): the generic 4337 path missed the 1.5× target (990 B/op) — now fixed.** The compact
   `SigpressEntry` bundle (root recomputed on chain, no per-op proofs) measures **98 B/op at N=128 on
   Monad testnet — 0.25–0.32× a normal tx**, well under target. The plain `handleAggregatedOps` path
@@ -198,8 +203,10 @@ Full detail in `docs/demo.md`.
 
 - **"Why not just use Falcon? It's smaller."** Falcon-512 is ~666 B/sig — still ~10× ECDSA and ~1.6×
   today's budget, with no aggregation in production. Aggregation fixes size for *any* scheme.
-- **"Isn't this just EIP-8288?"** EIP-8288 is a Draft *Ethereum protocol* change; nothing works today.
-  We built it on Monad, at the app layer, with an on-chain verifier nobody had written.
+- **"Isn't this just EIP-8288?"** The idea *is* EIP-8288's — we credit it plainly. The difference is that
+  EIP-8288 is a Draft *Ethereum protocol* change (needs a hard fork; nothing works today), and we built a
+  working **app-layer** version on Monad, with the on-chain hash-based verifier EIP-8288 only specifies.
+  Our contribution is the implementation and the Monad case, not the concept.
 - **"Is the verify number real?"** Yes — ~12.84M gas, one tx, on Monad testnet (tx hash in
   `decisions.md`); the verifier is 62.7 KB and would not fit Ethereum's 24 KB limit.
 - **"What's not done?"** Joining the prover to the on-chain verifier for *our* signature statement. The

@@ -118,8 +118,12 @@ already on Monad. ([Why hash-based = quantum-proof, in `pitch.md`.](docs/pitch.m
    Monad's 128 KB limit but would *not* fit Ethereum's 24 KB**, and a proof verifies for **~12.84M gas**
    (Monad gives 30M gas *per tx*; Ethereum gives 30M per *block*).
 3. **The rails and the gap are already here.** ERC-4337, EIP-7702 and a P-256 precompile are deployed, and
-   Monad's roadmap leaves the size question open. The Ethereum version of this idea (EIP-8288) needs a
-   consensus-breaking fork; we ship it at the **app layer, today.**
+   Monad's roadmap leaves the size question open. We ship it at the **app layer, today.**
+
+> **Credit:** the aggregation idea is **EIP-8288's** (Buterin & Coratger) — proposed for Ethereum's
+> protocol, needing a hard fork, not working anywhere yet. Sigpress is a working **app-layer
+> implementation** of that design on Monad, with the on-chain verifier it only specifies. We build on
+> 8288; we don't claim the concept.
 
 ---
 
