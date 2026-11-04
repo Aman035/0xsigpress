@@ -565,3 +565,39 @@ Comparisons:
   it works out to ~400k gas per signature; it only gets cheap near 2 × 256. The binding gaps are unchanged
   (the registrar is trusted for the root mapping; every signer in a batch signs one shared message; exactly
   two children).
+
+## K10 binding — proof bound on chain to signers and per-signer messages, no registrar (4 Nov 2026)
+
+- **Test:** replace K10's trusted registrar with an on-chain check, give every signer its own message, and
+  verify + bind in one tx on Monad testnet. Details, tx list, commands: `experiments/k10-terminal/binding/README.md`.
+- **Choice:** Poseidon1 (KoalaBear) in Solidity, not a Keccak digest from the guest: leanVM's ISA has no
+  Keccak, a zkDSL Keccak is a large job. Our generated `Poseidon1Hasher` (from sol-whir-p3's MIT-SPDX
+  constants; checked against leanVM's Apache-2.0 Python reference) costs ~50-57k gas per permutation vs
+  170,661 for sol-whir-p3's `LeanVmPoseidon1.permute` (measured, forge).
+- **Built:** patched aggregation guest (on K10's leanVM patch): raw-only mode where signature i is checked
+  against its own `hash_message(m_i)` and the public input commits to `hash_slice(messages)`; the XMSS
+  tweak table is derived in-guest from the slot (its hash slot pinned to zero, so the contract never hashes
+  the 1,480-element table). `SigpressValidityGate.sol`: recomputes the application root from (slot,
+  pubkeys, messages) calldata, requires equality with `proof.applicationRoot`, calls the verifier, rejects
+  replays (`AlreadyAccepted`), stores/emits the keccak batch commitment. Prover binary also reads K11 SDK
+  batch files (optional per-signer `message`).
+- **Measured (Monad testnet, 2 x 4 sigs, 8 distinct messages):** `submit` status 1, est. 15,038,841, charged
+  15,790,783, calldata 107,524 B, tx `0x8aff1467…d581f`; gate `0xd4ce9f04…a299`, verifier
+  `0x79ef057b…c7e4` (deploy charged 14,251,287), hasher `0xb42CFc7f…8dB2` (deploy est. 6,267,563, tx hash not
+  captured). eth_call: swapped batches / changed message / changed pubkey / wrong slot -> `RootMismatch`;
+  tampered proof -> `MERKLE_ROOT`; replay -> `AlreadyAccepted`. **K11 SDK-signed batches** proved to the
+  same fixed programs, accepted by the same verifier: `submit` est. 14,067,352, charged 14,770,719, tx
+  `0xc0365db3…9495`. Anvil: verifier alone 12,103,751; binding adds ~2.9M (first use of n) / ~1.9M (cached).
+- **Measured (binding gas vs N, forge, warm):** 1 / 4 / 16 / 64 / 128 signers per batch (x2): 0.91M / 1.86M
+  / 5.68M / 20.96M / 41.43M -> **~160k gas per signer**. With the ~12.2M verifier and the 30M tx cap that
+  allows about 105 signers per tx (arithmetic, not a measured tx).
+- **Measured (prover, 2 x 4, single runs):** all proving 63.7 s (SDK run; 116 s for the test-key run on a
+  swapping machine), max RSS 5.4-5.6 GB, terminal proof 111,063 B; all five proofs natively verified.
+- **Not bound / limits:** account <-> pubkey (needs a registry or 4337 account check); one XMSS slot for all
+  signers in a terminal; no recursion or duplicate signers in this mode; K11 `export-batch` still writes one
+  shared message (per-signer needs `signers[i].message`); in-guest tweak table tested by honest runs only.
+- **Decision:** the trustless link and per-signer messages work end to end on Monad at small N. The
+  Poseidon-in-Solidity binding is the new bottleneck (~160k gas/signer vs ~24k/sig for the proof at 512):
+  fine for a Blitz demo (2 x 4 to ~2 x 50), not for scale. Next for scale: a Keccak (or cheaper on-chain)
+  statement digest from the guest, or binding via an on-chain signer registry so per-tx calldata shrinks to
+  indices + messages; then account binding.
