@@ -16,20 +16,18 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 
 ---
 
-## The 15-second version
+## The problem
 
-Monad packs **~3,750 transactions** into a 300 ms block because an ECDSA signature is 65 bytes. Switch to
-the post-quantum scheme in Monad's own account-auth draft (ML-DSA, ~3.7 KB) and the same block holds
-**~370** — a **~90% capacity cut** at the MIP-12 400 B/tx average (**58-76%** at today's measured
-mainnet mix of 1,728 B/tx). Monad's roadmap never mentions this.
+**Monad is fast because it rations bytes.** A block is capped at **1.5 MB and 3,750 transactions**, every
+**300 ms** ([MIP-12](https://mips.monad.xyz/MIPs/MIP-12)). That budget only works because an ECDSA
+signature is **65 bytes**, so an average transaction is ~400 bytes and 3,750 of them fit.
 
-**Sigpress** keeps users signing with quantum-safe keys, but puts a **proof** on chain instead of the
-signatures. Live on Monad testnet today: a post-quantum operation costs **98 bytes** on chain instead of
-**2,276** — **23x smaller**, and 0.25x a normal ~400 B Monad transaction.
+**Quantum computers break that signature.** Shor's algorithm recovers an ECDSA private key from its public
+key — so the day a large quantum computer exists, any account whose key has touched the chain can be
+drained. The fix is **post-quantum signatures**, but they are **10–120× bigger**: ML-DSA-44, the scheme in
+Monad's own account-auth draft, is **~3.7 KB** (signature + key).
 
----
-
-## The problem — in one table
+**Put those on chain and the signature *is* the transaction** — so far fewer fit in a block:
 
 | Signature | Bytes/tx | Tx per 1.5 MB block | vs ECDSA |
 |---|---:|---:|---:|
@@ -38,13 +36,20 @@ signatures. Live on Monad testnet today: a post-quantum operation costs **98 byt
 | Falcon-512 | ~1,001 | ~1,500 | −60% |
 | SLH-DSA-128s | ~8,191 | ~183 | −95% |
 
-<sub>Block-capacity ceiling from [MIP-12](https://mips.monad.xyz/MIPs/MIP-12) + [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final). A capacity limit, not a live-TPS claim.</sub>
+<sub>Capacity ceiling from [MIP-12](https://mips.monad.xyz/MIPs/MIP-12) + [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) — a capacity limit, not a live-TPS claim.</sub>
 
-Post-quantum is **scheduled, not hypothetical**: NIST finalized the signature standards in 2024, Ethereum
-targets a quantum-safe L1 by ~2029, and Monad has a published PQ roadmap. But that roadmap makes accounts
-quantum-safe **without ever addressing signature size** — and Monad's own consensus paper, *Quantum
-Cadence*, gave up on aggregate signatures because "no post-quantum scheme matches BLS." **That gap is
-what Sigpress fills.**
+At MIP-12's ~400 B/tx model that's a **~90% capacity cut** for ML-DSA; even at today's *measured* mainnet
+mix (~1,728 B/tx average) it's still a **58–76% cut**. Either way, quantum-safe Monad is a far slower Monad.
+
+**And it's coming, unaddressed.** NIST finalized the PQ signature standards in 2024, Ethereum targets a
+quantum-safe L1 by ~2029, and Monad has published a PQ roadmap — but that roadmap makes accounts
+quantum-safe **without once mentioning signature size**, and Monad's own consensus paper *Quantum Cadence*
+gave up on aggregate signatures because "no post-quantum scheme matches BLS." Nobody has even sized this
+problem, let alone solved it.
+
+**Sigpress's answer:** don't put the signatures on chain — put **one hash-based proof** that they were all
+valid, and let Monad check the proof once. Users still sign with quantum-safe keys; a post-quantum
+operation costs **98 bytes** on chain instead of 2,276 (**23× smaller**, measured on testnet today).
 
 ---
 
