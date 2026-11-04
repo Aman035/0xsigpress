@@ -16,7 +16,8 @@
     "compact": "tsx scripts/compact.ts",
     "validity": "tsx scripts/validity.ts",
     "service": "tsx src/service/server.ts",
-    "watchtower": "tsx src/service/watchtower.ts"
+    "watchtower": "tsx src/service/watchtower.ts",
+    "service:demo": "tsx scripts/service-demo.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
