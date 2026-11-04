@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Env / secrets
+.env
+.env.*
+*.key
+
+# Node (for later build phases)
+node_modules/
+dist/
+build/
+
+# Kill-test / experiment scratch (research, throwaway)
+experiments/**/target/
+experiments/**/node_modules/
+experiments/**/out/
