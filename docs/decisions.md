@@ -497,3 +497,18 @@ Comparisons:
   **K4/K6 critical path cleared** at small N. Larger-N verifiers verified on anvil only (wallet has
   0.154 MON left after 3 faucet calls; ~2.8 MON needed per extra verifier + submit). Next: fund and
   deploy one fixed-shape verifier, bind the root on chain, move to per-user messages.
+
+## K10-terminal — one fixed-shape (2 x 256) verifier on Monad testnet (4 Nov 2026)
+
+- **Test:** deploy one verifier for the 2 x 256 child shape plus the gate; submit a full 512-signature
+  batch and a 2 x 4 batch padded to the same shape; tamper check. Log `experiments/k10-terminal/results/monad-2x256.jsonl`,
+  addresses/ABI/calldata format `experiments/k10-terminal/deployed-2x256.json`.
+- **Measured:** verifier `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` (deploy est. 13,572,474,
+  charged 14,251,097); gate `0xdf9bfc6a96fb36cef902eb9e95a65da4b5a94c8e`. **Full 2 x 256 `submit` tx
+  `0x02d582de…9021`: est. 12,195,486, charged 12,805,260, calldata 106,692 B, `accepted` = true** =
+  ~25.0k gas and ~208 B per signature at 512. Padded 2 x 4 on the same verifier: `verifyC1V1` `eth_call`
+  true (est. 12,018,281, 106,276 B), pair registered (tx `0x34baf6c8…e15c`), `submit` `eth_call` succeeds
+  (est. 12,178,749); tx not sent (0.29 MON left, ~1.31 MON per submit). Tampered 2 x 256 proof reverts `MERKLE_ROOT`.
+- **Decision:** one deployed fixed-shape verifier serves both a full and a padded small batch on Monad,
+  at ~12.2M gas per submit regardless of N (up to 256 per child). Binding gaps are unchanged and
+  now owned in `experiments/k10-terminal/binding/`.
