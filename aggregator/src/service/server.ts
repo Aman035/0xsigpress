@@ -14,6 +14,7 @@ import { AGG_DIR } from "../chain.ts";
 import { SIG_BYTES } from "../wots.ts";
 import { Batcher, RejectError, type BatcherConfig, type OpInput } from "./batcher.ts";
 import { viemChain, type ChainAdapter } from "./chain.ts";
+import { startRevealer, type RevealerOptions } from "./revealer.ts";
 import { toJson } from "./store.ts";
 
 const MAX_BODY = 64 * 1024;
@@ -130,6 +131,8 @@ export async function startService(opts: {
   publicUrl?: string;
   tickMs?: number;
   batcher?: Omit<BatcherConfig, "dir" | "publicUrl">;
+  /** Answer requestReveal on our batches from the DA store (SR-R1). Omit to not run it. */
+  revealer?: Omit<RevealerOptions, "aggregator" | "getDA">;
 }): Promise<ServiceHandle> {
   const host = opts.host ?? "127.0.0.1";
   // The DA URL goes into each BatchSubmitted event, so bind first to learn the port.
@@ -142,11 +145,13 @@ export async function startService(opts: {
   const b = new Batcher(opts.chain, { ...opts.batcher, dir: opts.dir, publicUrl: opts.publicUrl ?? url });
   handler = apiHandler(b);
   b.start(opts.tickMs ?? 500);
+  const rv = opts.revealer ? await startRevealer({ ...opts.revealer, aggregator: opts.chain.batches, getDA: (root) => b.getDA(root) }) : undefined;
   return {
     url,
     batcher: b,
     server,
     async close() {
+      await rv?.stop();
       await b.stop();
       server.closeAllConnections();
       await new Promise<void>((r) => server.close(() => r()));
@@ -176,6 +181,8 @@ async function main() {
     publicUrl: process.env.PUBLIC_URL,
     tickMs: num("TICK_MS", 500),
     batcher: { maxOps: num("MAX_OPS", 64), maxWaitMs: num("MAX_WAIT_MS", 5000), fallbackMs: num("FALLBACK_MS", 60_000) },
+    // Without this, anyone could requestReveal on our batches and slash them for half the bond.
+    revealer: process.env.REVEALER === "0" ? undefined : { keyVar: process.env.REVEAL_KEY_VAR ?? process.env.KEY_VAR },
   });
   console.log(`sigpress service on ${svc.url} (DA base ${process.env.PUBLIC_URL ?? svc.url})`);
   console.log(`chain ${chain.chainId}, entry ${chain.entry}, aggregator ${chain.batches}, sender ${chain.sender}, state ${dir}`);

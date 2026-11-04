@@ -1,8 +1,9 @@
 // End to end on a local anvil: deploy OptimisticAggregator + SigpressEntry with the forge script, run the
 // service and the watchtower in-process, push 10 good ops over HTTP -> one batch -> executed in one
 // executeBundle. Then a malicious batch (one tampered signature, DA published by the attacker) is posted
-// straight to the aggregator -> the watchtower challenges and slashes it; and a batch with no DA is logged
-// as missing. Skipped when anvil/forge are not installed. Uses anvil's default dev keys only.
+// straight to the aggregator -> the watchtower challenges and slashes it; a reveal request on an honest
+// batch is answered by the service's revealer; and a batch with no DA is flagged, its leaves are demanded
+// with requestReveal, and it is slashed when nobody can reveal them (SR-R1). Skipped when anvil/forge are not installed. Uses anvil's default dev keys only.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
@@ -29,6 +30,7 @@ const KEYS: Hex[] = [
   "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", // service
   keccak256(toBytes("sigpress e2e watchtower")), // watchtower (fresh key, funded below)
   "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6", // malicious aggregator
+  "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a", // service revealer
 ];
 const have = (bin: string) => spawnSync(bin, ["--version"], { stdio: "ignore" }).status === 0;
 const skip = !(have("anvil") && have("forge")) ? "anvil/forge not installed" : false;
@@ -36,6 +38,8 @@ const PORT = 19545 + Math.floor(Math.random() * 1000);
 const RPC = `http://127.0.0.1:${PORT}`;
 const WINDOW = 8;
 const BOND = parseEther("0.01");
+const REVEAL_DEPOSIT = parseEther("0.001");
+const REVEAL_WINDOW = 4;
 
 let anvil: ChildProcess | undefined;
 let dir = "";
@@ -65,7 +69,7 @@ before(async () => {
   const r = spawnSync("forge", ["script", "script/DeployCompact.s.sol", "--rpc-url", RPC, "--broadcast"], {
     cwd: CONTRACTS,
     encoding: "utf8",
-    env: { ...process.env, KEY_VAR: "SIGPRESS_E2E_KEY", SIGPRESS_E2E_KEY: KEYS[0], WINDOW: String(WINDOW), BOND: BOND.toString(), BATCHES: "" },
+    env: { ...process.env, KEY_VAR: "SIGPRESS_E2E_KEY", SIGPRESS_E2E_KEY: KEYS[0], WINDOW: String(WINDOW), BOND: BOND.toString(), REVEAL_DEPOSIT: REVEAL_DEPOSIT.toString(), REVEAL_WINDOW: String(REVEAL_WINDOW), BATCHES: "" },
   });
   if (r.status !== 0) throw new Error(`forge script failed: ${r.stderr || r.stdout}`);
   batches = r.stdout.match(/OptimisticAggregator (0x[0-9a-fA-F]{40})/)![1] as Address;
@@ -84,7 +88,7 @@ after(async () => {
 const seedOf = (i: number) => keccak256(toBytes(`svc-e2e-${i}`));
 const RECIPIENT = "0x000000000000000000000000000000000000bEEF" as Address;
 
-test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op; tampered batch -> watchtower slashes; missing DA is flagged", { skip, timeout: 180_000 }, async () => {
+test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op; reveal request answered; tampered batch -> watchtower slashes; missing DA -> reveal requests -> slashed", { skip, timeout: 180_000 }, async () => {
   const user = await getClients({ rpc: RPC, privateKey: KEYS[0] });
   const pc = user.publicClient;
   const towerAddr = (await getClients({ rpc: RPC, privateKey: KEYS[2] })).account.address;
@@ -96,7 +100,14 @@ test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op;
 
   // Service (its own key) + watchtower (another key), DA fallback = the service.
   const chain = await viemChain({ entry, rpc: RPC, privateKey: KEYS[1] });
-  svc = await startService({ chain, dir: join(dir, "svc"), tickMs: 200, batcher: { maxOps: 64, maxWaitMs: 1500, fallbackMs: 0, receiptTimeoutMs: 20_000, log: () => {} } });
+  const revealed: { id: bigint; index: number }[] = [];
+  svc = await startService({
+    chain,
+    dir: join(dir, "svc"),
+    tickMs: 200,
+    batcher: { maxOps: 64, maxWaitMs: 1500, fallbackMs: 0, receiptTimeoutMs: 20_000, log: () => {} },
+    revealer: { rpc: RPC, privateKey: KEYS[4], fromBlock: 0n, pollMs: 300, log: () => {}, onEvent: (e) => e.type === "revealed" && revealed.push(e) },
+  });
   tower = await startWatchtower({
     aggregator: batches,
     rpc: RPC,
@@ -150,7 +161,12 @@ test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op;
   const next = [0, 1].map((i) => signCompactOp({ seed: seedOf(i), keyIndex: 1, index: i, account: ops[i]!.account, nonce: 1n, chainId: 31337, entry, call: { target: RECIPIENT, value, data: "0x" } }));
   const ids2: string[] = [];
   for (const o of next) ids2.push(((await (await post({ index: o.index, target: o.target, value: o.value, data: o.data, nextPkHash: o.nextPkHash, sig: o.sig })).json()) as any).id);
-  await until("second batch submitted", async () => ((await (await fetch(`${svc!.url}/ops/${ids2[1]}`)).json()) as any).batch?.id);
+  const id2 = BigInt(await until("second batch submitted", async () => ((await (await fetch(`${svc!.url}/ops/${ids2[1]}`)).json()) as any).batch?.id));
+  // Someone demands leaf 0 of the service's batch on chain: the service's revealer answers it in time.
+  const prober = await getClients({ rpc: RPC, privateKey: KEYS[3] });
+  const rq = await prober.walletClient.writeContract({ address: batches, abi: aggregatorAbi, functionName: "requestReveal", args: [id2, 0n], value: REVEAL_DEPOSIT });
+  assert.equal((await pc.waitForTransactionReceipt({ hash: rq })).status, "success");
+  await until("service revealed leaf 0", () => revealed.find((r) => r.id === id2 && r.index === 0), 30_000);
   const other = signCompactOp({ seed: seedOf(1), keyIndex: 1, index: 1, account: ops[1]!.account, nonce: 1n, chainId: 31337, entry, call: { target: RECIPIENT, value: 2n, data: "0x" } });
   const direct = await user.walletClient.writeContract({
     address: ops[1]!.account,
@@ -204,5 +220,12 @@ test("anvil e2e: 10 good ops -> one batch -> executed; moved account -> dead op;
   const miss = await until("DA missing flagged", () => events.find((e) => e.type === "da-missing" && e.id === ghostId), 30_000);
   assert.match(miss.type === "da-missing" ? miss.reason : "", /DA unavailable/);
   assert.ok(towerLog.some((l) => l.includes("DA MISSING") && l.includes(`batch ${ghostId}`)));
-  await until("ghost batch window closes unchecked", () => events.find((e) => e.type === "closed-unchecked" && e.id === ghostId), 30_000);
+  // Nobody can reveal the ghost batch's leaves: the watchtower demands them and slashes after the deadline.
+  await until("watchtower requested reveals", () => events.filter((e) => e.type === "reveal-requested" && e.id === ghostId && e.mine).length === 3, 30_000);
+  const gs = await until("ghost batch slashed for missing reveal", () => events.find((e) => e.type === "slashed-unrevealed" && e.id === ghostId), 30_000);
+  assert.equal(gs.type === "slashed-unrevealed" && gs.index, 0);
+  const [, , , , ghostSlashed, ghostFinal] = await pc.readContract({ address: batches, abi: aggregatorAbi, functionName: "batches", args: [ghostId] });
+  assert.equal(ghostSlashed, true);
+  assert.equal(ghostFinal, false);
+  await until("other reveal deposits reclaimed", async () => (await pc.readContract({ address: batches, abi: aggregatorAbi, functionName: "openReveals", args: [ghostId] })) === 0n, 30_000);
 });
