@@ -119,6 +119,16 @@ contract OptimisticAggregatorInvariantTest is Test {
         assertEq(address(agg).balance, active * agg.bond());
     }
 
+    /// SR-R2: every slash burns bond - bond/2 (the challenger gets bond/2), so slashing never refunds a bond.
+    function invariant_slashBurnsHalf() public view {
+        uint256 slashed;
+        for (uint256 id = 0; id < h.count(); id++) {
+            (,,,, bool s,) = agg.batches(id);
+            if (s) slashed++;
+        }
+        assertEq(agg.BURN().balance, slashed * (agg.bond() - agg.bond() / 2));
+    }
+
     /// A batch is never both slashed and finalized (slashed never finalizes; finalized never slashes).
     function invariant_slashedXorFinalized() public view {
         for (uint256 id = 0; id < h.count(); id++) {

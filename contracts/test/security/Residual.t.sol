@@ -53,20 +53,21 @@ contract ResidualTest is Test {
         assertEq(thief.balance, 1 ether);
     }
 
-    /// SR-R2 (bond economics): anyone may challenge, including the aggregator itself. An aggregator caught
-    /// with a bad batch front-runs the honest challenger with its own challenge and gets the full bond back,
-    /// so a failed fraud attempt costs it only gas.
-    function test_residual_selfChallengeRefundsBond() public {
+    /// SR-R2 (fixed): a slash pays half the bond to the challenger and burns the rest, so an aggregator that
+    /// front-runs the honest challenger with its own challenge still loses half its bond.
+    function test_fixed_selfChallengeLosesHalfBond() public {
         bytes32 pk = WOTSHelper.pkHash(seed, 1);
         bytes32 m = keccak256("op");
         bytes memory badSig = new bytes(2144);
         bytes32 leaf = agg.leafOf(pk, m, badSig);
         uint256 before = aggregator.balance;
+        uint256 burnBefore = agg.BURN().balance;
         vm.prank(aggregator);
         uint256 id = agg.submitBatch{value: BOND}(leaf, 1, "");
         vm.prank(aggregator);
         agg.challenge(id, pk, m, badSig, 0, new bytes32[](0));
-        assertEq(aggregator.balance, before, "aggregator lost nothing");
+        assertEq(before - aggregator.balance, BOND - BOND / 2, "self-challenge must cost half the bond");
+        assertEq(agg.BURN().balance - burnBefore, BOND - BOND / 2);
     }
 
     /// SR-R3 (fixed): a failing call no longer reverts the op. The key rotates and the nonce moves (logged as
