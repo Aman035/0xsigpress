@@ -20,10 +20,12 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 
 Monad packs **~3,750 transactions** into a 300 ms block because an ECDSA signature is 65 bytes. Switch to
 the post-quantum scheme in Monad's own account-auth draft (ML-DSA, ~3.7 KB) and the same block holds
-**~370** — a **~90% capacity cut**. Monad's roadmap never mentions this.
+**~370** — a **~90% capacity cut** at the MIP-12 400 B/tx average (**58-76%** at today's measured
+mainnet mix of 1,728 B/tx). Monad's roadmap never mentions this.
 
 **Sigpress** keeps users signing with quantum-safe keys, but puts a **proof** on chain instead of the
-signatures. Live on Monad testnet today at **0.89 bytes per operation**.
+signatures. Live on Monad testnet today: a post-quantum operation costs **98 bytes** on chain instead of
+**2,276** — **23x smaller**, and 0.25x a normal ~400 B Monad transaction.
 
 ---
 
@@ -54,7 +56,8 @@ what Sigpress fills.**
 
 | | Measured on Monad testnet |
 |---|---|
-| 🟢 **Batch of 256 ops → one 32-byte root** | **102,063 gas · 0.89 bytes/op** |
+| 🟢 **Batch of 256 ops → one 32-byte root** | **102,063 gas · 0.89 bytes/op of signature overhead** |
+| 🟢 **Compact bundle: 128 PQ ops executed in one tx** | **98 bytes/op on chain** · ~27k gas/op ([tx](https://testnet.monadexplorer.com/tx/0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd)) |
 | ⚪ Naive PQ (one signature on chain) | 118,606 gas · 2,276 bytes |
 | 🔪 **Tamper one signature** | `challenge` → **bond slashed, batch rejected on chain** |
 | 👤 PQ 4337 account executes from a finalized batch | ~134,634 gas |

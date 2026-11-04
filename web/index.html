@@ -102,7 +102,7 @@
         <div class="label"><span>transactions per 1.5 MB block</span><span id="sigCapTxt">—</span></div>
         <div class="bar full"><span id="sigBar" style="width:0%"></span></div>
       </div>
-      <div class="cap">per operation <b id="sigBpo">0.89</b> B · back to the block's tx-count ceiling</div>
+      <div class="cap">per executed operation <b id="sigBpo">98.9</b> B (98 B packed op + <span id="rootBpo">0.89</span> B root share) · back to the block's tx-count ceiling</div>
       <dl class="kv">
         <dt>batch gas</dt><dd id="batchGas">—</dd>
         <dt>ops / batch</dt><dd id="batchCount">—</dd>
@@ -208,7 +208,9 @@ function addrLink(explorer, label, addr) {
   document.getElementById("naiveTx").innerHTML = txLink(ex, res.naive?.txHash);
 
   // Sigpress lane — bytes/op so small that capacity returns to the tx-count ceiling
-  const bpo = res.batch?.bytesPerOp ?? 0.89;
+  const rootBpo = res.batch?.bytesPerOp ?? 0.89;
+  const bpo = Math.round(((res.compact?.bytesPerOp ?? 98.0) + rootBpo) * 10) / 10;
+  document.getElementById("rootBpo").textContent = Math.round(rootBpo * 100) / 100;
   const sigCap = Math.min(TX_CAP, Math.floor(BYTE_CAP / Math.max(bpo, 0.0001)));
   document.getElementById("sigCapTxt").textContent = "~" + fmt(sigCap);
   document.getElementById("sigBar").style.width = (sigCap / TX_CAP * 100) + "%";

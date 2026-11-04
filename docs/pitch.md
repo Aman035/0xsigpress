@@ -20,7 +20,7 @@ tx hash in `decisions.md`). Where something is an estimate, it says so.
 >
 > Sigpress gives the capacity back: users sign with quantum-safe keys; an aggregator folds a batch into
 > **one hash-based proof** and Monad checks it once. Live on testnet today, one 32-byte root per batch
-> (**0.89 bytes/op measured**); the one-STARK-over-1,024-signatures version is proven feasible and is the
+> (signature overhead **0.89 B/op**; a whole executed op is **98 B** vs 2,276 B naive, measured); the one-STARK-over-1,024-signatures version is proven feasible and is the
 > product.
 
 ---
@@ -113,7 +113,10 @@ Three reasons, each now backed by a measurement, not a claim:
 
 **Optimistic lane — live end to end:**
 - **Naive PQ baseline:** one WOTS (hash-based) signature verified fully on chain — **118,606 gas, 2,276 B**.
-- **Sigpress batch:** 256 ops folded into one 32-byte Merkle root — **102,063 gas, 0.89 bytes/op**.
+- **Sigpress batch:** 256 ops folded into one 32-byte Merkle root — **102,063 gas, 0.89 bytes/op** of
+  signature overhead.
+- **Compact execution:** 128 PQ ops executed in one `executeBundle` tx — **98 bytes/op on chain**, ~27k
+  gas/op (vs 2,276 B naive, 990 B via ERC-4337).
 - **The kill shot:** one tampered signature → `challenge` → **bond slashed, batch rejected on chain**.
 - **PQ accounts:** ERC-4337-style accounts execute transfers only from a finalized batch, key rotating
   per op — **~134,634 gas/execute**.
@@ -178,9 +181,9 @@ Full detail in `docs/demo.md`.
    own account-auth draft and it holds ~370 — a 90% cut. The roadmap never mentions signature size."
 2. **(0:20–0:50) Idea + money shot.** "Don't put signatures on chain — put one commitment per batch.
    Here's 256 real PQ signatures as a single 32-byte root." → `submitBatch` tx on the explorer:
-   102,063 gas, **0.89 bytes/op**.
+   102,063 gas, **0.89 bytes/op** of signature overhead.
 3. **(0:50–1:10) Comparison.** Two gauges (labelled *capacity model*): naive PQ fills the block; Sigpress
-   returns it to the tx-count ceiling. Scoreboard: 2,144 B/sig → 0.89 B/op.
+   returns it to the tx-count ceiling. Scoreboard: a whole PQ op goes from 2,276 B → **98 B** on chain (23x).
 4. **(1:10–1:30) Kill shot.** Tamper one signature → `challenge` tx: **bond slashed, batch rejected on
    chain.** "On chain, not on trust. Optimistic today; the STARK validity proof — verifier already runs
    on Monad at 12.8M gas — is the product."

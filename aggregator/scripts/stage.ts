@@ -65,6 +65,20 @@ async function pause(next: string) {
 
 // ---------- setup ----------
 const N = Number(process.env.N ?? 256);
+// Measured on Monad testnet by `pnpm compact` (128-op executeBundle): bytes per executed op.
+const COMPACT_BPO = (() => {
+  try {
+    const c = JSON.parse(readFileSync(new URL("../deployments-compact.json", import.meta.url), "utf8"));
+    return Number(c.runs?.["128"]?.rawTxBytesPerOp ?? 98);
+  } catch { return 98; }
+})();
+const COMPACT_GAS_PER_OP = (() => {
+  try {
+    const c = JSON.parse(readFileSync(new URL("../deployments-compact.json", import.meta.url), "utf8"));
+    const r = c.runs?.["128"];
+    return r ? Math.round(r.gasCharged / 128) : 27184;
+  } catch { return 27184; }
+})();
 const BAD = Number(process.env.BAD_INDEX ?? 7);
 if (!Number.isInteger(N) || N < 1 || N > 4096) throw new Error(`N must be an integer 1..4096 (got ${process.env.N})`);
 if (!Number.isInteger(BAD) || BAD < 0 || BAD >= N) throw new Error(`BAD_INDEX must be in 0..${N - 1}`);
@@ -162,23 +176,24 @@ if (!naive) {
   writeResults({ naive });
 }
 const naiveTxCap = Math.min(TX_CAP, Math.floor(BLOCK_BYTES / naive.calldataBytes));
-// Batch: one tx carries N ops; bytes cap no longer binds, so the tx cap times N is the ceiling (model).
-const batchOpsCap = Math.min(TX_CAP * N, Math.floor(BLOCK_BYTES / batchInput) * N);
 table(
   [
     ["", "naive (1 sig on chain)", `Sigpress batch (${fmt(N)} ops)`],
-    ["bytes on chain per op", red(`${fmt(naive.calldataBytes)} B`), green(`${fmt(batchBytesPerOp, 2)} B`)],
-    ["gas charged per op", fmt(naive.gasUsed), green(fmt(batchGas / N))],
+    ["signature bytes on chain per op", red(`${fmt(naive.calldataBytes)} B`), green(`${fmt(batchBytesPerOp, 2)} B`)],
+    [`whole executed op on chain ${dim("(compact bundle)")}`, red(`${fmt(naive.calldataBytes)} B`), green(`${fmt(COMPACT_BPO + batchBytesPerOp, 1)} B`)],
+    ["gas charged per op: batch root only", fmt(naive.gasUsed), green(fmt(batchGas / N))],
+    [`gas charged per executed op ${dim("(compact bundle)")}`, fmt(naive.gasUsed), green(fmt(COMPACT_GAS_PER_OP + batchGas / N))],
     ["transactions", fmt(1), `1 for ${fmt(N)} ops`],
-    [`PQ ops/block, sig bytes only ${yellow("(model)")}`, red(fmt(naiveTxCap)), green(fmt(batchOpsCap))],
+    [`PQ ops per 1.5 MB block, bytes only ${yellow("(model)")}`, red(fmt(naiveTxCap)), green(fmt(Math.floor(BLOCK_BYTES / (COMPACT_BPO + batchBytesPerOp))))],
   ],
   ["l", "r", "r"],
 );
-console.log(dim(`  (model) = min(${fmt(TX_CAP)} tx cap, ${fmt(BLOCK_BYTES)} B ÷ bytes per tx) × ops per tx. Counts signature bytes only:`));
-console.log(dim(`  it ignores each op's own execution gas (executeFromBatch measured ~135k gas), so it is a ceiling, not live TPS.`));
+console.log(dim(`  (model) = ${fmt(BLOCK_BYTES)} B ÷ bytes per executed op (naive also capped at ${fmt(TX_CAP)} tx). Bytes only: gas (~${fmt(COMPACT_GAS_PER_OP)}/op`));
+console.log(dim(`  measured) would cap a 150M-gas block near ${fmt(Math.floor(150_000_000 / COMPACT_GAS_PER_OP))} ops. A ceiling, not live TPS.`));
 console.log(`\n  naive tx  ${cyan(txLink(explorer, naive.txHash as Hash))}${naiveFresh ? "" : dim(" (from results.json)")}`);
 console.log(`  batch tx  ${cyan(txLink(explorer, batchTx))}`);
-console.log(`  ${bold(`${fmt(naive.calldataBytes / batchBytesPerOp)}x fewer bytes per op.`)} ${dim("Optimistic: signatures are checked off chain, a bonded challenge catches fraud (Beat 4).")}`);
+console.log(`  ${bold(`${fmt(naive.calldataBytes / (COMPACT_BPO + batchBytesPerOp))}x fewer bytes per executed op`)} ${dim(`(compact bundle measured on testnet: ${COMPACT_BPO} B/op at 128 ops).`)}`);
+console.log(`  ${dim("Signature overhead alone:")} ${bold(`${fmt(naive.calldataBytes / batchBytesPerOp)}x smaller.`)} ${dim("Optimistic: signatures are checked off chain, a bonded challenge catches fraud (Beat 4).")}`);
 stage.comparison = { naiveTx: naive.txHash, naiveFresh, naiveBytesPerOp: naive.calldataBytes, naiveGasPerOp: naive.gasUsed, batchBytesPerOp, batchGasPerOp: batchGas / N, at: new Date().toISOString() };
 await pause("Beat 4 (tamper)");
 

@@ -178,8 +178,10 @@ WOTS verify ~110k on anvil).
 | PQAccount executes op from finalized batch (4 accounts, 0.0001 MON each) | avg 134,634 gas (incl. 30% buffer) | first: `0xc3a6411d33ed43ea9c013a7ee387cef064ef7d3ca3e26f1ce7b88604e98c9353` |
 | PQAccount direct (WOTS verified on chain, single-op fallback) | 186,088 gas (incl. 30% buffer) | `0x9b690e18962beaa97859fae38a063b8f17aa68d718844ef6d4b1eee3159ae2c6` |
 
-**What this means:** bytes on chain per PQ-signed op drop from 2,276 B (naive) to under 1 B (batch
-root), so the block-byte cap stops binding — but this is the **optimistic** design: a bad signature is
+**What this means:** *signature* bytes on chain per PQ-signed op drop from 2,276 B (naive) to under 1 B
+(batch root). **Correction (later the same day):** the op itself still has to be on chain to execute —
+measured at 98 B/op with the compact bundle (see "K9 fix — compact entry"), so a whole PQ op is ~99 B vs
+2,276 B naive (23x), not <1 B. The block-byte cap still stops binding — but this is the **optimistic** design: a bad signature is
 only caught if someone challenges within the window (shown working above). The validity-proof (STARK)
 version is still gated on K3/K4. The per-op execute cost is dominated by the account call + Merkle
 proof, not the signature.
