@@ -112,3 +112,34 @@ live-mainnet block sampling noted under K1.
 - **Decision:** ship the `demo.md` fallback — on-chain WOTS (Keccak, hash-based) verification plus
   optimistic aggregation (Merkle root + bond on chain, single-signature fraud proof slashes the bond).
   Pitch says "optimistic today, validity proof (STARK) next". See `docs/hackathon-plan.md`.
+
+## Blitz build — first measured numbers on Monad testnet (4 Nov 2026)
+
+Deployed with `scripts/testnet.sh` (chain 10143). Explorer: https://testnet.monadexplorer.com/tx/<hash>.
+
+| Contract | Address |
+|---|---|
+| NaiveLane | `0xcFc286564ed4281E200c6D052f9E1A932b31E845` |
+| OptimisticAggregator (bond 0.01 MON, window 120 s) | `0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E` |
+| PQAccountFactory | `0x7335b48f2d794d4a196618916Ec196a1a1615442` |
+
+**Important measurement note:** on Monad the receipt's `gasUsed` equals the tx **gas limit** (checked with
+`cast tx <h> gas` vs `cast receipt <h> gasUsed` — identical). So every gas figure below is *gas charged*
+(= limit we set), not gas executed. Naive/batch/tamper used viem's estimate as the limit; the execute
+flow used estimate × 1.3 (buffer added after a first `submitBatch` ran out of gas at an 85,468 limit,
+tx `0xac9cd910…5fd23`). Execution-only gas from `forge test --gas-report` / anvil is lower (e.g. naive
+WOTS verify ~110k on anvil).
+
+| What | Measured (testnet, gas charged) | Tx |
+|---|---|---|
+| Naive: 1 WOTS signature verified on chain | 118,606 gas; 2,276 B calldata | `0x26f4bcbf31d0b508bc97d169b4951972d3246e8605c97da177133875180604b0` |
+| Optimistic batch of 256 signed ops | 102,063 gas total (~399 gas/op); 228 B input (**0.89 B/op**) | `0x724ec6e8b54d4a8ec255276173d2b2daaf278b43d09303fee215ea663715c3ea` |
+| Tamper: 256-op batch, sig #7 bad → challenge | slashed = true | submit `0x1761b395b10477de521f0c936dd9878f92227ca126612e6dd352385e14fe27e2`, challenge `0xfafe5108cb194d701f439fccac90bb5b0758e2727c7e5187401fc576f7f90399` (166,542 gas) |
+| PQAccount executes op from finalized batch (4 accounts, 0.0001 MON each) | avg 134,634 gas (incl. 30% buffer) | first: `0xc3a6411d33ed43ea9c013a7ee387cef064ef7d3ca3e26f1ce7b88604e98c9353` |
+| PQAccount direct (WOTS verified on chain, single-op fallback) | 186,088 gas (incl. 30% buffer) | `0x9b690e18962beaa97859fae38a063b8f17aa68d718844ef6d4b1eee3159ae2c6` |
+
+**What this means:** bytes on chain per PQ-signed op drop from 2,276 B (naive) to under 1 B (batch
+root), so the block-byte cap stops binding — but this is the **optimistic** design: a bad signature is
+only caught if someone challenges within the window (shown working above). The validity-proof (STARK)
+version is still gated on K3/K4. The per-op execute cost is dominated by the account call + Merkle
+proof, not the signature.
