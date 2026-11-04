@@ -2,7 +2,8 @@
 // Solidity verifier + SigpressTerminalGate on Monad. This module drives the research prover in
 // experiments/k10-terminal/ (vendored, not reused as product code) and submits its proof to the gate.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   bytesToHex,
@@ -20,12 +21,15 @@ import {
   type Hex,
 } from "viem";
 import { AGG_DIR, type getClients } from "./chain.ts";
+import { createLeanXmssKeyStore, leanxmssExportBatch, leanxmssKeygen, leanxmssSign, leanxmssVerify, type LeanXmssSignature } from "./sdk/leanxmss.ts";
 
 export const K10_DIR = resolve(AGG_DIR, "../experiments/k10-terminal");
 export const VALIDITY_OUT = resolve(AGG_DIR, "out/validity");
 export const PROVER_LOCK = "/private/tmp/claude-501/sigpress-prover.lock";
 const SOL_DIR = resolve(K10_DIR, "vendor/sol-whir-p3");
 const LEANVM_DIR = resolve(K10_DIR, "vendor/leanVM");
+// K11: same chain, but the two batches come from SDK-signed batch files (sigpress-leanxmss export-batch).
+const K11_SIGNER_DIR = resolve(AGG_DIR, "../experiments/k11-leanxmss/signer");
 const GATE_ARTIFACT = resolve(K10_DIR, "gate/out/SigpressTerminalGate.sol/SigpressTerminalGate.json");
 const GATES_FILE = resolve(AGG_DIR, "deployments-validity.json");
 
@@ -77,6 +81,59 @@ export interface ProofMeta {
   terminalProofBytes?: number; // native postcard proof size
   verifyCalldataBytes: number; // verifyC1V1 calldata.bin
   createdAt: string;
+  source?: "test-keys" | "sdk"; // test-keys: keys generated inside the K10 prover; sdk: SDK-signed batch files
+  sdk?: SdkBatchesInfo;
+}
+
+/** Two SDK-signed leanXMSS batch files, ready for the K11 terminal runner. */
+export interface SdkBatchesInfo {
+  left: string; // batch file paths
+  right: string;
+  perChild: number;
+  logSlots: number;
+  slot: number;
+  keygenMsTotal: number;
+  signMsTotal: number;
+  batchBytes: [number, number];
+}
+
+/**
+ * Fresh user keys through the TS SDK (aggregator/src/sdk/leanxmss.ts): 2 x perChild keys, each with its own
+ * KeyStore; left keys sign the left root, right keys the right root, all at one aggregator-picked slot; each
+ * signature is verified, then each side is exported as a batch file. Keys/state live in dir/keys (contain seeds).
+ */
+export function signSdkBatches(opts: { dir: string; perChild: number; left: Hex; right: Hex; logSlots?: number; slot?: number; log: (s: string) => void }): SdkBatchesInfo {
+  const { dir, perChild, left, right, log } = opts;
+  const logSlots = opts.logSlots ?? 4;
+  const slot = opts.slot ?? 3;
+  const keys = resolve(dir, "keys");
+  mkdirSync(keys, { recursive: true, mode: 0o700 });
+  let keygenMs = 0;
+  let signMs = 0;
+  const sides: [string, Hex][] = [["left", left], ["right", right]];
+  const out: string[] = [];
+  const bytes: number[] = [];
+  for (const [side, root] of sides) {
+    const sigs: LeanXmssSignature[] = [];
+    for (let k = 0; k < perChild; k++) {
+      const key = leanxmssKeygen(bytesToHex(randomBytes(32)), resolve(keys, `${side}-${k}.key.json`), { logSlots });
+      keygenMs += key.keygenMs;
+      const ks = createLeanXmssKeyStore(resolve(keys, `${side}-${k}.state.json`), key);
+      const t0 = performance.now();
+      const sig = leanxmssSign(key, ks, root, { slot });
+      signMs += performance.now() - t0;
+      ks.close();
+      if (!leanxmssVerify(sig.publicKey, sig.slot, root, sig.signature)) throw new Error(`SDK signature ${side}-${k} does not verify`);
+      sigs.push(sig);
+    }
+    const path = resolve(dir, `batch-${side}.json`);
+    const e = leanxmssExportBatch(sigs, path);
+    if (e.signers !== perChild) throw new Error(`export-batch kept ${e.signers}/${perChild} signers`);
+    log(`${side}: ${perChild} SDK keys (logSlots ${logSlots}) signed ${root} at slot ${slot} -> ${path} (${e.bytes} B)`);
+    out.push(path);
+    bytes.push(e.bytes);
+  }
+  return { left: out[0]!, right: out[1]!, perChild, logSlots, slot, keygenMsTotal: Math.round(keygenMs), signMsTotal: Math.round(signMs), batchBytes: [bytes[0]!, bytes[1]!] };
 }
 
 const sh = (cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}) => {
@@ -89,20 +146,21 @@ const sh = (cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.Proc
  * Prove two fresh leanXMSS batches (perChild signers each, each batch signs its own 32-byte root) and
  * write the terminal proof + Solidity calldata into outDir. Holds the shared prover lock while proving.
  */
-export function prove(opts: { outDir: string; perChild: number; left: Hex; right: Hex; target: Target; log: (s: string) => void }): ProofMeta {
-  const { outDir, perChild, left, right, target, log } = opts;
-  const bin = resolve(LEANVM_DIR, "target/release/sigpress-xmss-terminal");
-  if (!existsSync(bin)) throw new Error(`prover binary missing: ${bin} (see experiments/k10-terminal/README.md Commands)`);
+export function prove(opts: { outDir: string; perChild: number; left: Hex; right: Hex; target: Target; log: (s: string) => void; sdk?: SdkBatchesInfo }): ProofMeta {
+  const { outDir, perChild, left, right, target, log, sdk } = opts;
+  // sdk: the K11 runner (same chain, batches read from SDK-signed batch files); else K10 in-prover test keys.
+  const bin = sdk ? resolve(K11_SIGNER_DIR, "target/release/sigpress-leanxmss-terminal") : resolve(LEANVM_DIR, "target/release/sigpress-xmss-terminal");
+  const cwd = sdk ? K11_SIGNER_DIR : LEANVM_DIR;
+  if (!existsSync(bin)) throw new Error(`prover binary missing: ${bin} (see experiments/k10-terminal/README.md or experiments/k11-leanxmss/README.md Commands)`);
   const env = [
     "LEANVM_PROVING_TIMEOUT_SECONDS=0",
     `LEANVM_TERMINAL_EXPORT=${q(resolve(outDir, "native"))}`,
-    `SIGPRESS_LEFT_ROOT=${left}`,
-    `SIGPRESS_RIGHT_ROOT=${right}`,
+    ...(sdk ? [`SIGPRESS_BATCH_LEFT=${q(sdk.left)}`, `SIGPRESS_BATCH_RIGHT=${q(sdk.right)}`] : [`SIGPRESS_LEFT_ROOT=${left}`, `SIGPRESS_RIGHT_ROOT=${right}`]),
     ...(target.minLogRows ? [`SIGPRESS_MIN_LOG_ROWS=${target.minLogRows}`] : []),
   ].join(" ");
   const cmd = `${env} /usr/bin/time -l ${q(bin)} ${perChild} ${q(resolve(outDir, "report.json"))} ${q(resolve(K10_DIR, "profiles/sigpress_c1.json"))}`;
   // Shared 16 GB machine: one prover at a time. The trap releases the lock on success, failure or Ctrl-C.
-  const script = `until mkdir ${PROVER_LOCK} 2>/dev/null; do sleep 10; done; trap 'rmdir ${PROVER_LOCK} 2>/dev/null' EXIT INT TERM; cd ${q(LEANVM_DIR)} && ${cmd} > ${q(resolve(outDir, "proving.log"))} 2>&1`;
+  const script = `until mkdir ${PROVER_LOCK} 2>/dev/null; do sleep 10; done; trap 'rmdir ${PROVER_LOCK} 2>/dev/null' EXIT INT TERM; cd ${q(cwd)} && ${cmd} > ${q(resolve(outDir, "proving.log"))} 2>&1`;
   log(`waiting for prover lock ${PROVER_LOCK} ...`);
   const t0 = performance.now();
   const r = spawnSync("bash", ["-c", script], { stdio: "inherit" });
@@ -112,6 +170,10 @@ export function prove(opts: { outDir: string; perChild: number; left: Hex; right
   const rss = /(\d+)\s+maximum resident set size/.exec(logTxt);
   const wall = /([\d.]+) real/.exec(logTxt);
   const meta = finish(outDir, target);
+  if (sdk && (meta.leftBatchRoot.toLowerCase() !== left.toLowerCase() || meta.rightBatchRoot.toLowerCase() !== right.toLowerCase()))
+    throw new Error("proof batch roots differ from the SDK-signed roots");
+  meta.source = sdk ? "sdk" : "test-keys";
+  if (sdk) meta.sdk = sdk;
   meta.proveSeconds = Math.round((wall ? Number(wall[1]) : proveSeconds) * 10) / 10;
   if (rss) meta.maxRssBytes = Number(rss[1]);
   writeFileSync(resolve(outDir, "validity-proof.json"), JSON.stringify(meta, null, 2) + "\n");
