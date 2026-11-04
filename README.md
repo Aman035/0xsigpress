@@ -23,11 +23,67 @@ then a ~4-month product. Nothing is built until the kill tests pass.
 | [`docs/decisions.md`](docs/decisions.md) | The fact-check pass and every kill-test answer, with sources |
 | [`docs/demo.md`](docs/demo.md) | What the Blitz demo looks like, and the build checklist |
 
+## What's live on Monad testnet (chain 10143)
+
+The Blitz build ships the **optimistic** design from [`docs/demo.md`](docs/demo.md) — post-quantum end to
+end, no STARK required yet. Real WOTS (hash-based) signatures, an optimistic aggregator that puts only a
+32-byte Merkle root per batch on chain, PQ smart accounts that execute from finalized batches, and a
+tamper → challenge → slash path.
+
+- **NaiveLane** `0xcfc286564ed4281e200c6d052f9e1a932b31e845`
+- **OptimisticAggregator** `0xeaa3ac4807767f8fe5b8cad979cb523a926b2a1e`
+- **PQAccountFactory** `0x7335b48f2d794d4a196618916ec196a1a1615442`
+- Explorer: https://testnet.monadexplorer.com
+
+Measured so far: naive PQ verify **118,606 gas** / 2,276 B calldata; batch of 256 ops in one
+`submitBatch` at **102,063 gas** (**0.89 bytes/op**); PQ-account execute **~134,634 gas**; one bad
+signature **slashed on chain**. (See [`docs/decisions.md`](docs/decisions.md) for tx hashes.)
+
+## Demo page
+
+`web/` is a single static page: two capacity-model lanes (naive vs Sigpress), a scoreboard, the tamper
+result, and Monad explorer links — all read from `web/public/results.json` + `deployments.json`.
+
+```sh
+cd web && python3 -m http.server 8080   # then open http://localhost:8080
+```
+
+It also opens directly from the filesystem (it falls back to embedded numbers if it can't fetch the JSON).
+Gauges are labelled **"capacity model"** — the page never shows a faked live-TPS figure.
+
+## Run the contracts and aggregator
+
+```sh
+# contracts (Foundry)
+cd contracts && forge test
+
+# aggregator (Node + viem): WOTS keygen/sign, Merkle batching, demo/tamper scripts
+cd aggregator && pnpm install && pnpm test
+
+# one-shot testnet deploy + demo (needs a funded PRIVATE_KEY in .env, never committed)
+./scripts/testnet.sh
+```
+
+## Honest limits
+
+- **Optimistic, not a validity proof (yet).** Today's on-chain object is a Merkle root + bond with a
+  challenge window; the aggregator serves the signature data. The one-hash-based-STARK-over-N-signatures
+  version is the product (kill tests K3–K6, ~4 months).
+- **Stateful keys.** WOTS one-time keys must never be reused; the account rotates to a fresh key per op,
+  signed into each message.
+- Every number in the repo, on the page, or in the pitch is either measured on testnet (with a tx hash)
+  or labelled a capacity model / sample.
+
 ## Status (4 Nov 2026)
 
 Tier 0 kill tests pass: **K1** (naive ML-DSA cuts block capacity 85-90%) and **K2** (nobody has shipped
-PQ aggregation on any chain). The critical path now starts at **K3** (choose a proof system) → **K4**
-(verify a real proof on Monad testnet — the go/no-go). See [`docs/decisions.md`](docs/decisions.md).
+PQ aggregation on any chain). **K3** has a first local data point (a Spartan-WHIR Solidity verifier runs
+on anvil at ~1.1M gas for an example proof); **K4** (a signature-batch proof verified on Monad testnet)
+is still the go/no-go. See [`docs/decisions.md`](docs/decisions.md).
 
 All numbers are either sourced (with links) or marked as unmeasured placeholders. Several EIP, Monad and
 benchmark claims were corrected against primary sources on 4 Nov 2026.
+
+## Licence
+
+[MIT](LICENSE).

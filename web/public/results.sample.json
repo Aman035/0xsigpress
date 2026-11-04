@@ -1,0 +1,26 @@
+{
+  "sample": true,
+  "_note": "Placeholder with the same shape as results.json, used before real testnet numbers land. Labelled 'sample' on the page.",
+  "naive": {
+    "txHash": "",
+    "gasUsed": 118606,
+    "calldataBytes": 2276
+  },
+  "batch": {
+    "txHash": "",
+    "gasUsed": 102063,
+    "count": 256,
+    "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "bytesPerOp": 0.890625
+  },
+  "tamper": {
+    "submitTx": "",
+    "challengeTx": "",
+    "slashed": true
+  },
+  "execute": {
+    "gasPerExecute": 134634,
+    "directGas": 186088,
+    "finalizeTx": ""
+  }
+}
