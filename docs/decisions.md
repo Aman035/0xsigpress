@@ -241,3 +241,80 @@ testnet run and a proof of our own statement are still to do. K4 is not yet pass
   leanXMSS vs our WOTS) is the remaining work — K3 estimates 1-2 weeks if the terminal prover is
   obtainable, 4+ otherwise (estimate, not measured). Go/no-go: full validity-proof version is
   **go on gas/size grounds**; the risk has moved to prover availability.
+
+## K8 / K9 — ERC-4337 `handleAggregatedOps` on Monad testnet, and bytes per aggregated op (4 Nov 2026)
+
+**Setup.**
+- **EntryPoint:** v0.8 at `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108` has code on Monad testnet (`cast code`). It is
+  confirmed v0.8 by `eip712Domain()` = ("ERC4337", "1", chainId 10143) and `senderCreator()` =
+  `0x449ED7C3e6Fee6a97311d4b55475DF59C44AdD33`. Its bytecode contains the `handleAggregatedOps` selector `0xdbed18e0`.
+  v0.7 (`0x0000000071727De22E5E9d8BAf0edaC6f37da032`), v0.6 (`0x5FF137D4…2789`) and `0x433709009B8330FDa32311DF1C2AFA402eD8D009`
+  also have code. We did not test them.
+- **Licence:** eth-infinitism/account-abstraction is GPL-3.0 at the repo level (GitHub licence API). We copied nothing.
+  `contracts/src/aa/IERC4337.sol` is minimal interfaces written fresh from the ERC-4337 ABI (MIT).
+- **Contracts** (`contracts/src/aa/`, MIT):
+  - `SigpressAggregator4337` (IAggregator): optimistic mode. `validateSignatures` checks that each op's leaf
+    `keccak256(pkHash ‖ m ‖ sigHash)` is in a **finalized, unslashed** `OptimisticAggregator` batch, with
+    `m = keccak256(abi.encode(chainId, OptimisticAggregator, pkHash, nextPkHash, userOpHash))`. It verifies no WOTS
+    signature on chain.
+  - `PQAccount4337`: its `validateUserOp` returns the aggregator address in validationData and rotates the key to
+    `nextPkHash = userOp.signature` (32 B).
+  - `PQAccount4337Factory`: CREATE2 factory.
+- **Bundling:** an EOA calls `handleAggregatedOps` directly; no bundler is involved. The ERC-7562 storage and opcode rules
+  bind bundlers' mempool simulation, not on-chain execution. They did not block us. Our aggregator reads account storage
+  and calls back into `EntryPoint.getUserOpHash`, which a public-mempool bundler might reject. **This means we have not
+  tested a third-party bundler (Rundler or others) or a hosted Monad bundler.**
+
+**Tests.** `forge test --match-path test/aa/Aggregated4337.t.sol` runs against a fork of Monad testnet, using the real
+v0.8 EntryPoint. 7/7 tests pass:
+- An aggregated bundle of 4 ops executes: 4 transfers, keys rotated, nonces bumped.
+- Two ops from one account in one bundle chain their keys.
+- These revert with `SignatureValidationFailed(aggregator)`: batch not finalized; wrong sigHash; op callData changed after
+  signing; `nextPkHash` swapped.
+- `handleOps` without the aggregator reverts with `FailedOp(0, "AA24 signature error")`.
+
+**Testnet run** (`KEY_VAR=PRIVATE_KEY_K8 pnpm aa`, EOA `0x5C67CeA0B2e717E7AB3c0A7a04AD25D749D0F8e1`):
+
+| Step | Tx |
+|---|---|
+| Deploy SigpressAggregator4337 `0xe6869caa26a2581880a8d237c1a1f9a26c6c212e` | `0x56e4ab3301fd88dae4a0c508f8f7ef3a44a958e337369f374aa228d93b62ed83` |
+| Deploy PQAccount4337Factory `0x21d2ee544075fb5da08bc44bd9a68f6d736e6563` | `0x75a03fc1a9c928f59e09941e4aeb0960099d1e71b29ae1aa8791d1ca1f64aa76` |
+| submitBatch (batch 7, 4 leaves) on the live OptimisticAggregator `0xEAA3…2A1E` | `0x2c60751ffc1c69e3dea7bc5972b613e808bb36c7ae81d8e90020927af7233f94` |
+| finalize after the 120 s window | `0xf6288141f4a75774264162a0acee709c96c7712d1ab0c806fd00c3efe1354bee` |
+| **handleAggregatedOps, 4 UserOps, all `UserOperationEvent.success = true`** | `0xaad5ef866a9068c3c59f49d63801199a17433805c7caf4d6c38cca1cb7026ee5` |
+
+- **Gas charged:** 828,003 for the `handleAggregatedOps` tx (~207k per op). On Monad, receipt `gasUsed` equals the gas
+  limit. Here the limit was viem's estimate × 1.3.
+- **Gas executed:** the same script on an anvil fork of Monad testnet used 454,743 gas (~114k per op). This was not
+  measured on Monad itself.
+- Each op had vGL 100k, cGL 50k, PVG 50k and maxFee 112.2 gwei, so the prefund was 0.0224 MON per op.
+
+- **Decision: K8 PASS.** An ERC-4337 aggregated bundle (EntryPoint v0.8, custom IAggregator) executes on Monad testnet.
+  The "standard 4337" pitch line holds for the **on-chain** path.
+- **Open:** bundler and mempool support for this aggregator. We have not tested Rundler, and we have not asked hosted Monad
+  bundlers whether they accept ops for an unknown aggregator. We also did not test v0.9.
+
+**K9 — bytes per op, measured from the tx above (4 ops):**
+
+| Quantity | Bytes |
+|---|---|
+| tx input (calldata) | 3,844, of which 2,971 are zero bytes (77%) |
+| signed raw tx (re-serialised from RPC fields) | 3,960 → **990 B per op** |
+| one ABI-encoded UserOp (plain transfer, empty initCode/paymaster, 32 B sig field) | 672 |
+| aggregated signature (batchId + 4 × (index, 2-level proof, sigHash)) | 992 (248 per op) |
+
+Comparisons:
+- **Naive on-chain WOTS:** 2,276 B per signature. The 4337 path is **2.3x smaller**.
+- **A "normal Monad tx" (~400 B, from the MIP-12 arithmetic in K1; not measured here):** the 4337 path is **2.5x bigger**.
+  The pass line was 1.5x, so this fails. The ABI-encoded UserOp alone (672 B, 1.7x) breaks the line before any PQ data
+  is added.
+- **Derived from ABI encoding rules, not measured:** the aggregated signature costs `128 + 32·log2(N)` B per op. It grows
+  to ~384 B per op at N = 256, which gives ~1,060 B per op in total.
+
+- **Decision: K9 FAIL** against the 1.5x line, though not fatal. It is still a 2.3x byte reduction over naive PQ
+  verification. The overhead is 4337's ABI padding (mostly zero bytes) and the Merkle proofs, not the PQ signature.
+- **Fallback, as plan.md says:** a compact bundle format through our own entry contract. It could pack fields, share gas
+  fields per bundle, and recompute the root from the whole batch so that no per-op proofs are needed. This is a design
+  idea and is unmeasured. A middle step that stays within 4337 is a "whole batch" aggregated-signature mode: bundle =
+  batch, root recomputed, 32 B sigHash per op. That would make the signature part ~32 B per op, but the 672 B UserOp
+  remains.
