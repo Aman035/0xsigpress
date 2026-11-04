@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+libs = ["../vendor/sol-whir-p3/lib"]
+allow_paths = ["../vendor/sol-whir-p3"]
+solc = "0.8.28"
+optimizer = false
+evm_version = "prague"
+code_size_limit = 131072
+gas_limit = 1000000000
+fs_permissions = [{ access = "read", path = "./" }, { access = "read", path = "../vendor/sol-whir-p3-binding-v2/testdata" }, { access = "read", path = "../vendor/sol-whir-p3-binding-v2/out" }]
+remappings = [
+  "forge-std/=../vendor/sol-whir-p3/lib/forge-std/src/",
+]
