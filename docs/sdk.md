@@ -178,13 +178,14 @@ are exactly what the leanVM aggregation program verifies.
 |---|---|---|
 | Verified by | Solidity (`XMSS.sol`, `XMSSAccount`), optimistic batch path | the leanVM aggregation program, and so the K10 terminal proof verified on chain |
 | Use for | direct ops and the optimistic aggregator | validity-proof batches |
-| Message model | each op signs its own message | **every signer in a batch signs the same 32-byte message at the same slot** (single-message aggregation) |
+| Message model | each op signs its own message | each signer signs **its own 32-byte message** (its op hash); all signers of one proof sign at the **same slot** (binding v2). The older single-message mode (one shared batch root) still exists |
 | Public key / signature | 32 B root / 2,528 B at h = 10 | 32 B / 1,208 B (any key size) |
 | Runs in | pure TS | needs the Rust binary (`SIGPRESS_LEANXMSS_BIN`) |
 
-So today a leanXMSS batch commits a set of signers to one shared 32-byte root (e.g. a batch root). Per-user
-messages (one userOp per signer) need multi-message aggregation or a different guest. That isn't built (K10
-README, "What the proof binds").
+Since binding v2 (4 Nov 2026, `experiments/k10-terminal/binding-v2/`) a batch carries one message per signer:
+the SDK exports a per-signer batch (`leanxmssExportBatch(sigs, path, { perSigner: true })`, CLI `export-batch
+--per-signer`) and the binding-v2 prover reads `signers[i].message`. For the validity service the message is
+`ValidityEntry.opHash(account, nonce, target, value, data)` (`validityOpHash` in `src/validity.ts`).
 
 ### Using it
 
@@ -204,9 +205,26 @@ vendor checkout (`experiments/k10-terminal/vendor/leanVM` with the K10 patch) an
 file feeds `sigpress-leanxmss prove-batch` (one leanVM aggregation proof plus a native verify) or
 `sigpress-leanxmss-terminal` (the full K10 chain).
 
-On chain: `SOURCE=sdk PER_CHILD=16 pnpm validity` makes 2 × 16 SDK keys, signs and exports both batches,
-proves them padded to the 2 × 256 shape, and submits through the K12 gate. The first run was accepted on Monad
-testnet in tx `0x08957c47…f152d` (12,812,290 gas charged, 32 signatures; `docs/decisions.md`, "K11 on chain").
+Per-signer, for validity proofs (binding v2):
+
+```ts
+import { leanxmssGatePubkey, leanxmssSignAsync, leanxmssExportBatch } from "./src/sdk/leanxmss.ts";
+
+const sig = await leanxmssSignAsync(key, ks, opHash, { slot });          // async CLI call (parallel signing)
+leanxmssExportBatch([sig, ...othersAtThisSlot], "./batch-left.json", { perSigner: true });
+leanxmssGatePubkey(key.publicKey);   // the gate / ValidityEntry encoding: each 32-bit limb big-endian
+```
+
+`leanxmssGatePubkey` matters: the SSZ public key stores its 8 KoalaBear limbs little-endian, the gate's calldata and
+the `ValidityEntry` registry hold them big-endian. Register the gate form (`ValidityEntry.createAccount(gatePubkey,
+salt)`).
+
+On chain: `pnpm validity` (default `SOURCE=sdk`, `SHAPE=2x256`) makes 2 × 256 fresh SDK keys (logSlots 4), each
+signs its own op hash at one slot, exports both per-signer batches, proves them and submits to the v2 gate. Run of
+4 Nov 2026 on Monad testnet: 512 keys in 11.4 s, 512 signatures in 26.3 s (8 parallel CLI calls), proof 50.9 s,
+[tx `0x58793519…f7b`](https://testnet.monadexplorer.com/tx/0x58793519fb294680ecd1b69dffe26580bc59e3ac5ddb4c28ceaec1396de99f7b)
+15,717,137 gas charged, 512 distinct messages. 2 × 1024: 2,048 keys in 43.6 s, signatures in 107.2 s, proof 62.1 s.
+(The earlier single-message run, `0x08957c47…f152d`, went through the registrar-trusted v1 gate.)
 
 ### Key state
 
@@ -242,10 +260,9 @@ Prover side, 4 CLI-signed signatures (`experiments/k11-leanxmss/results/`):
 
 ### Limits
 
-- Not run on chain from CLI-signed keys. We didn't generate or call a Solidity verifier for the K11 run. K10
-  did that for its own in-process test keys with the same shape.
-- The batch root isn't yet bound to the proof's application root on chain (K10's registrar gap), and neither is
-  the signer set.
+- Per-signer messages and the signer set are now bound on chain by the v2 gate. The gate binds keys, not
+  accounts: the `ValidityEntry` registry (account sets its key once, at creation) does that, and a key can't be
+  rotated there.
 - Keys can't be rotated in place, and slots are a plain counter. The CLI is a research binary (shell-out per
   call, no daemon). Security: leanVM's own README says the WHIR profiles are 100-bit component targets and that
   a composition analysis is still owed.
