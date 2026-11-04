@@ -144,7 +144,7 @@ Repo layout:
 | K5 | PASS | leanVM: 1,024 sigs → 326 B/sig, 2.29 s on base M4 |
 | K6 | FAIL direct / PASS via wrap | raw leanVM proof needs binary-field math (>100M gas est.); Keccak-only terminal wrap works (K4) |
 | K8 | PASS | `handleAggregatedOps` on EntryPoint v0.8, 4 PQ ops in one tx |
-| K9 | FAIL (not fatal) | ~990 B/op via 4337 (UserOp encoding 672 B); <1 B/op via our own entry path |
+| K9 | FAIL via 4337 / **PASS via compact entry** | ~990 B/op via 4337 (UserOp encoding 672 B); **98 B/op** (128 ops, raw tx) via `SigpressEntry` on testnet |
 
 **Go/no-go:** validity-proof version is **go on gas and size**. The critical path is now the terminal
 prover (wrap leanVM's proof of our batch into the Keccak terminal format) and binding its public input
@@ -166,5 +166,5 @@ Verify more with: `forge verify-contract <addr> <path:Name> --chain 10143 --veri
 ## Phase 3 (in progress)
 
 - [ ] Terminal prover: find/build the leanVM → Keccak terminal wrap (critical path for the STARK version) — `experiments/k10-terminal/`
-- [ ] K9 fix: compact `SigpressEntry` bundle format (root recomputed on chain, no per-op proofs), bytes/op measured on testnet
+- [x] K9 fix: compact `SigpressEntry` bundle format (root recomputed on chain, no per-op proofs), bytes/op measured on testnet
 - [ ] XMSS multi-use keys (Merkle of 2^h WOTS keys) + TS SDK with crash-safe key state + `docs/sdk.md`
