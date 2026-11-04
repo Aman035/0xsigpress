@@ -30,10 +30,14 @@ end, no STARK required yet. Real WOTS (hash-based) signatures, an optimistic agg
 32-byte Merkle root per batch on chain, PQ smart accounts that execute from finalized batches, and a
 tamper → challenge → slash path.
 
-- **NaiveLane** `0xcfc286564ed4281e200c6d052f9e1a932b31e845`
-- **OptimisticAggregator** `0xeaa3ac4807767f8fe5b8cad979cb523a926b2a1e`
-- **PQAccountFactory** `0x7335b48f2d794d4a196618916ec196a1a1615442`
-- Explorer: https://testnet.monadexplorer.com
+Source-verified on MonadVision / Sourcify:
+
+- **NaiveLane** `0xcFc286564ed4281E200c6D052f9E1A932b31E845`
+- **OptimisticAggregator** `0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E`
+- **PQAccountFactory** `0x7335b48f2d794d4a196618916Ec196a1a1615442`
+- **SigpressAggregator4337** (IAggregator) `0xe6869caa26a2581880a8d237c1a1f9a26c6c212e`
+- **PQAccount4337Factory** `0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`
+- Explorers: https://testnet.monadexplorer.com · https://testnet.monadvision.com
 
 Measured so far: naive PQ verify **118,606 gas** / 2,276 B calldata; batch of 256 ops in one
 `submitBatch` at **102,063 gas** (**0.89 bytes/op**); PQ-account execute **~134,634 gas**; one bad
