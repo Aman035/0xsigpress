@@ -318,3 +318,29 @@ Comparisons:
   idea and is unmeasured. A middle step that stays within 4337 is a "whole batch" aggregated-signature mode: bundle =
   batch, root recomputed, 32 B sigHash per op. That would make the signature part ~32 B per op, but the 672 B UserOp
   remains.
+
+## K5 / K6 — proof size, prove time, and hash on both sides (4 Nov 2026)
+
+- **Test:** leanMultisig/leanVM @ `4b67ca0` (MIT + Apache-2.0, checked from files), leanXMSS
+  aggregation, measured on Apple M4 (base, 10 cores) 16 GB. Commands, raw output and the
+  verifier-counting patch: `experiments/k5/README.md`, `experiments/k5/results/`.
+  `./target/release/leanvm aggregate --xmss N --log-inv-rate 1 --repeat 3` under `/usr/bin/time -l`;
+  `leanvm recursion --n 4 --xmss-per-leaf 1024`.
+- **Measured (K5):** N=256: 306,992 B proof (1,199 B/sig), 0.554 s, 1.8 GB. **N=1,024: 334,104 B
+  (326 B/sig), 2.289 s mean of 3 (2.13-2.44 s), 6.3 GB, verify 9.5 ms (Rust).** With the signer set
+  (pubkey+message, 64 B/sig) on the wire: 400,217 B (391 B/sig). N=2,048: 357,408 B (175 B/sig) but
+  28.4 s, memory-bound (12.8 GB footprint on 16 GB). N=4,096 in one leaf **fails**
+  (`WitnessOutOfRange`, log 29); as 4×1,024 leaves + 4→1 recursion: 342.6 KiB at rate 1/2 (≈86 B/sig,
+  step 0.94 s) or 245.5 KiB at rate 1/4 (≈61 B/sig, step 0.78 s).
+  Self-reported (M4 Max 48 GB, not ours): 1,400 sigs, 359.5 KiB, 1.15 s; we are ~2.7× slower per sig.
+- **Measured (K6):** signature hash = Keccak-256 truncated to 16 B (proved via KECCAK opcode/GKR);
+  Merkle = Keccak-256; transcript = duplex sponge on the **raw Keccak-f permutation**; field = 192-bit
+  binary tower. One verification at N=1,024 does 5,524 Keccak-256 calls, 937 raw transcript
+  permutations, **~107k GF(2^192) multiplications** (+ ~72k smaller/table mults). No Poseidon anywhere.
+  EVM-side cost of the field work is estimated (not measured) at >100M gas even at 1,000 gas/mult —
+  over the 30M cap; the EVM has no carry-less multiply.
+- **Decision: K5 PASS** (326 B/sig ≤ 400 at 1,024; 2.29 s ≤ 3 s, narrow, on a modest machine).
+  **K6 FAIL for a direct EVM verifier of the current leanVM proof; PASS only via the K3/K4 route**
+  (KoalaBear + Keccak-256-only terminal, 12.84M gas measured on Monad), whose prover is not public.
+  On-chain bytes would then be the constant ~106,628 B terminal (≈104 B/sig at 1,024, unmeasured for
+  our statement); the wrap step's prove time is unmeasured. Risk remains prover availability.
