@@ -140,7 +140,6 @@ contract: per the version analysis above, it would be rejected.
 | ethereum/spartan-whir, Client-Side-Proving/spartan-whir-export | **no LICENSE file** — research only |
 
 So the prover side is clean to reuse; the Solidity verifier still is not, until a LICENSE file appears.
-`outreach.md` is a draft (not sent) asking for licence files and about non-Spartan children.
 
 ## Next step
 

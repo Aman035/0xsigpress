@@ -369,4 +369,4 @@ Comparisons:
   Open, unmeasured: aggregation uses `default_whir_config` vs the lift's explicit profile; root needs
   exactly two children; on-chain binding of a Poseidon1 root to our batch; 16 GB RAM vs the authors'
   17.8 GB peak. Estimate (not measured): 1-2 weeks. Verifier repos still lack LICENSE files; draft
-  request in `experiments/k10-terminal/outreach.md` (not sent).
+  request dropped: we build the chain ourselves (no outreach).
