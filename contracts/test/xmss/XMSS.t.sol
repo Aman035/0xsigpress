@@ -77,6 +77,12 @@ contract XMSSTest is Test {
         }
     }
 
+    /// Same vector as aggregator/test/sdk-xmss.test.ts: TS and Solidity derive identical trees.
+    function test_rootMatchesTsVector() public pure {
+        bytes32 r = XMSSHelper.root(XMSSHelper.realLeaves(keccak256("x"), 4));
+        assertEq(r, 0xebe1a9d135175043167aa1d10a73043c61e392f92494becbdc74e860328c7483);
+    }
+
     function test_wrongPathRejected() public view {
         (bytes memory sig, bytes32[] memory path) = _sig(3, m);
         path[2] = bytes32(uint256(path[2]) ^ 1);
