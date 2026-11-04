@@ -204,6 +204,10 @@ vendor checkout (`experiments/k10-terminal/vendor/leanVM` with the K10 patch) an
 file feeds `sigpress-leanxmss prove-batch` (one leanVM aggregation proof plus a native verify) or
 `sigpress-leanxmss-terminal` (the full K10 chain).
 
+On chain: `SOURCE=sdk PER_CHILD=16 pnpm validity` makes 2 × 16 SDK keys, signs and exports both batches,
+proves them padded to the 2 × 256 shape, and submits through the K12 gate. The first run was accepted on Monad
+testnet in tx `0x08957c47…f152d` (12,812,290 gas charged, 32 signatures; `docs/decisions.md`, "K11 on chain").
+
 ### Key state
 
 - A slot is the leanXMSS one-time index. KeyStore index i = slot `activationSlot + i`. The state file is the

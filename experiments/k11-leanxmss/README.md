@@ -34,6 +34,10 @@ the same `root-fixture.json` the sol-whir-p3 generator consumes. **Not done:** g
 for this run or calling one on chain (that tooling lives in `experiments/k10-terminal`). The child dimension (20)
 matches K10's 2 x 4 run, but we have not checked on chain that K10's deployed 2 x 4 verifier accepts this proof.
 
+**Update (on chain):** done in the product instead: `SOURCE=sdk pnpm validity` (in `aggregator/`) proves 2 x 16
+SDK-signed batches padded to the 2 x 256 shape. The deployed 2 x 256 verifier accepted the proof in tx
+`0x08957c47f9638ad29a3ebff6f2b6de1fd7e80562388cde8500a42919940f152d` (see `docs/decisions.md`, "K11 on chain").
+
 ## Scheme facts (from the vendored source, not measured)
 
 - Field KoalaBear (p = 2^31 - 2^24 + 1), hash Poseidon1 16-wide compression, digests 4 field elements.

@@ -538,3 +538,30 @@ Comparisons:
   hidden in the digest, one shared message per batch, test keys, composition not analysed).
 - **Decision:** the validity lane is runnable from the product scripts and shown on the demo page; the
   stage demo submits a pre-built proof (proving is ~1 min, ~6-7 GB) and says so on screen.
+
+## K11 on chain — SDK-signed leanXMSS batches verified on Monad testnet (4 Nov 2026)
+
+- **Test:** sign with real user keys from the TS SDK instead of the prover's built-in test keys. 32 fresh
+  leanXMSS keys made through `aggregator/src/sdk/leanxmss.ts` (random seeds, logSlots 4, one KeyStore each).
+  Two batches of 16. The left keys sign the left 32-byte batch root, the right keys sign the right root,
+  all at slot 3. Each signature is checked, then each batch goes out through `export-batch`. Proved by the
+  K11 runner `sigpress-leanxmss-terminal`, padded to the 2 × 256 shape (`SIGPRESS_MIN_LOG_ROWS=18,13,16`),
+  under the shared prover lock. The application root is checked off chain (`tools/app_root.py`), the K10
+  generator builds the calldata, and the proof goes to the already-deployed 2 × 256 verifier
+  `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` through gate `0xE2BFD06CC8677df23909dD4ee801b2A9D286f119`
+  (registrar = K12 wallet). Command: `SOURCE=sdk PER_CHILD=16 pnpm validity` (new `SOURCE=sdk` option).
+  Results are in `aggregator/out/results.json` under `validitySdk`.
+- **Measured (single run, busy shared machine):** SDK keygen 92 ms total and signing 1.7 s total for all 32
+  keys (about 53 ms per CLI sign). Batch files 40,469 B each. Prove 54.7 s wall (leanVM proving 47.6 s),
+  max RSS 5.60 GB. Terminal proof 111,109 B. `verifyC1V1` `eth_call` returned true. Register tx
+  `0xfa075a95b0af4234a65fe64d3ee88b4c256cc7762f0631b8acd0c666d2213330` (59,797 gas used). **`submit` tx
+  `0x08957c47f9638ad29a3ebff6f2b6de1fd7e80562388cde8500a42919940f152d`: status 1, block 76,891,511,
+  estimate 12,202,181, charged 12,812,290, calldata 106,884 B, 32 signatures, `accepted` = true** (checked
+  again with `cast call`). Gas price 102 gwei; the wallet went from 3.769 to 2.457 MON. A tampered proof (one
+  bit flipped at byte 60,000 of the submit calldata) makes the `eth_call` revert with `MERKLE_ROOT`.
+- **Decision:** keys made and signed by the SDK now go all the way through the chain to an accepted
+  on-chain verification. No change to the verifier or the gate was needed: the fixed-shape verifier
+  accepts SDK-signed batches as they are. Cost is the same fixed ~12.8M gas per submit, so at 32 signatures
+  it works out to ~400k gas per signature; it only gets cheap near 2 × 256. The binding gaps are unchanged
+  (the registrar is trusted for the root mapping; every signer in a batch signs one shared message; exactly
+  two children).
