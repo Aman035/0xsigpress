@@ -2,52 +2,37 @@
 
 **Sigpress — post-quantum signature aggregation for Monad.**
 
-Numbers in this pitch are one of two kinds:
-- **Sourced** facts carry a link to a primary source and may be stated plainly.
-- **[Bracketed]** numbers are placeholders for things the kill tests in `plan.md` must still
-  *measure* (proof size for our batch, verification gas on Monad, proving throughput). Never present a
-  bracketed number as fact. See `decisions.md` for what has and hasn't been verified.
+Every number below is either **sourced** (primary-source link) or **measured on Monad testnet** (with a
+tx hash in `decisions.md`). Where something is an estimate, it says so.
 
-> **What we shipped at Monad Blitz:** the **optimistic** version — post-quantum end to end, live on Monad
-> testnet, no STARK required. Real WOTS signatures, a 32-byte root per batch (0.89 bytes/op measured),
-> PQ smart accounts executing from finalized batches, and a tamper → challenge → slash path. The
-> **one-hash-based-STARK-over-N-signatures** version below is the product (kill tests K3–K6). So the
-> honest one-line framing is: **optimistic aggregation today, STARK validity proofs next.**
+> **One-line framing:** optimistic aggregation is **live on Monad testnet today**; the hash-based-STARK
+> validity-proof version is **proven feasible** (verifier runs on Monad, prover hits the size/speed
+> bars) and blocked on one integration — joining the two. See §3 (efforts) and §4 (unknowns).
 
 ---
 
 ## The 30-second version
 
-> Monad is built to pack ~3,750 transactions into a 300-millisecond block, because a signature is only
-> 65 bytes. Switch those signatures to the post-quantum scheme in Monad's own account-authentication
-> draft (ML-DSA, ~3.7 KB) and the same block holds about **370** — roughly a **90% cut in block
-> capacity.**
+> Monad packs ~3,750 transactions into a 300 ms block because an ECDSA signature is 65 bytes. Switch to
+> the post-quantum scheme in Monad's own account-auth draft (ML-DSA, ~3.7 KB) and the same block holds
+> about **370** — a **~90% cut in block capacity**. Nobody has said this out loud; Monad's own roadmap
+> never mentions signature size.
 >
-> Sigpress gives that capacity back. Users still sign every transaction with a quantum-safe key; an
-> aggregator folds a batch of those signatures into **one hash-based STARK**, and a single contract on
-> Monad verifies the proof once.
->
-> Same security, **~263 bytes per signature** instead of ~2,420, on Monad today with no fork.
+> Sigpress gives the capacity back: users sign with quantum-safe keys; an aggregator folds a batch into
+> **one hash-based proof** and Monad checks it once. Live on testnet today, one 32-byte root per batch
+> (**0.89 bytes/op measured**); the one-STARK-over-1,024-signatures version is proven feasible and is the
+> product.
 
 ---
 
-## The 3-minute version
+## 1. The problem
 
-### 1. The number nobody has said out loud
+Monad's throughput is a byte budget, not magic. [MIP-12](https://mips.monad.xyz/MIPs/MIP-12) (Final) caps
+a block at **1,500,000 bytes and 3,750 transactions** every **300 ms**
+([docs](https://docs.monad.xyz/developer-essentials/summary)) — ~400 bytes per transaction, which only
+works because ECDSA is 65 bytes. Post-quantum signatures are 10–120× bigger, so they eat the budget:
 
-Monad's throughput comes from byte budgets, not magic. [MIP-12](https://mips.monad.xyz/MIPs/MIP-12)
-(Final) caps a block at **1,500,000 bytes and 3,750 transactions**, produced every **300 ms**
-([docs](https://docs.monad.xyz/developer-essentials/summary),
-[300 ms blocks](https://monad.xyz/blog/300ms-block-times)). That is ~400 bytes per transaction, which
-works because an ECDSA signature is 65 bytes.
-
-Monad's [post-quantum roadmap](https://monad.xyz/blog/post-quantum-roadmap) (Ahmadvand, 28 Sep 2026)
-and its [account-authentication draft](https://forum.monad.xyz/t/flexible-and-upgradeable-account-authentication/526)
-(Babel & Camenisch) make accounts quantum-safe — the draft's authenticators include **ML-DSA**
-([FIPS 204](https://csrc.nist.gov/pubs/fips/204/final): 2,420-byte signature + 1,312-byte key). Put that
-on chain and the arithmetic is unforgiving:
-
-| Signatures | Bytes/tx | Transactions per block | vs ECDSA |
+| Signature | Bytes/tx | Tx per block | vs ECDSA |
 |---|---|---|---|
 | ECDSA (today) | ~400 | 3,750 | — |
 | ML-DSA-44, sig + key | ~4,067 | **~370** | −90% |
@@ -55,159 +40,166 @@ on chain and the arithmetic is unforgiving:
 | Falcon-512 | ~1,001 | ~1,500 | −60% |
 | SLH-DSA-128s | ~8,191 | ~183 | −95% |
 
-*(Block-capacity ceiling, re-derived from MIP-12 + FIPS; see `decisions.md`, K1. These are capacity
-limits, not a claim about current live throughput.)*
+*(Block-capacity ceiling from MIP-12 + [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final); a capacity
+limit, not a live-TPS claim. See `decisions.md`, K1.)*
 
-**Here is the gap.** The roadmap names schemes (HAWK, SQIsign) and the auth draft states "each scheme
-has a fixed gas cost" — but **neither gives a single number for signature size, bandwidth or
-block capacity.** Monad's own consensus paper, *Quantum Cadence*
-([arXiv 2610.32803](https://arxiv.org/abs/2610.32803)), abandons quorum certificates precisely because
-"no post-quantum scheme yet matches [BLS]'s aggregate size and speed." The size problem is open at both
-the account layer and the consensus layer.
+And it is an **acknowledged-but-unsolved** problem on Monad. The
+[PQ roadmap](https://monad.xyz/blog/post-quantum-roadmap) (Ahmadvand, 28 Sep 2026) and the
+[account-auth draft](https://forum.monad.xyz/t/flexible-and-upgradeable-account-authentication/526)
+(Babel & Camenisch) make accounts quantum-safe but give **no number for signature size or block
+capacity**. Monad's consensus paper *Quantum Cadence* ([arXiv 2610.32803](https://arxiv.org/abs/2610.32803))
+drops BLS quorum certificates precisely because "no post-quantum scheme yet matches [BLS]'s aggregate
+size and speed." Open at the account layer, explicitly unsolved at the consensus layer.
 
-### 2. The idea
+**The idea:** don't put the signatures on chain — put a proof that they were valid. Users sign every op
+with a hash-based key; the aggregator proves "all N signatures verify" in one hash-based STARK; one Monad
+contract verifies it. The proof is hash-based (Keccak Merkle + Fiat–Shamir + a WHIR commitment), so the
+whole path is quantum-safe — **no pairings, no trusted setup, no BLS, no Groth16** (unlike the Groth16/PLONK
+SP1 gateways already on Monad, which are *not* post-quantum).
 
-Don't put the signatures on chain. Put a proof that they were valid.
+## 2. Why it's worth building
 
-Users sign every operation with a hash-based post-quantum key (leanXMSS-style), exactly as before. Our
-**aggregator** collects a batch, proves "all of these signatures verify against their accounts and their
-operations" in a single **STARK**, and submits the batch with that one proof. One contract on Monad
-runs the **verifier** once.
+**The threat is scheduled, not hypothetical.** NIST finalized the PQ signature standards in Aug 2024
+(ML-DSA / FIPS 204, SLH-DSA / FIPS 205); Ethereum targets a quantum-resistant L1 by ~Dec 2029; Monad has
+published a PQ roadmap. The industry has already decided PQ is coming — the open question is the *cost*
+of getting there. The day elliptic-curve crypto falls, every ECDSA account whose public key is on chain
+(any address that has ever spent) can be forged and drained. Migration takes years, so the work must
+start before Q-day, not after.
 
-The proof is itself hash-based (collision-resistant hashes, Fiat–Shamir, a polynomial commitment such
-as WHIR), so nothing in the path is breakable by a quantum computer. **No pairings, no trusted setup,
-no BLS, no Groth16.**
+**Every throughput chain hits the same wall — Monad first.** PQ signatures are 10–120× bigger than
+ECDSA, so going quantum-safe costs 60–95% of block capacity on any chain that is full. That makes
+aggregation the *enabling primitive* for PQ at scale, not a nice-to-have. Monad, whose product is
+throughput, is where it bites first and hardest — so a working answer is most valuable and most visible
+here.
 
-### 3. Live demo (the moment)
+**It's infrastructure, not a feature.** A shared PQ-verification service is something wallets, games,
+exchanges and the protocol itself come to depend on — a primitive like a bundler or a DA layer, with the
+moat that comes from being depended on. The natural end state is Monad adopting it natively; being the
+reference implementation is the position you want when that happens.
 
-A load generator fires thousands of quantum-safe transactions.
-- **Left gauge — naive post-quantum:** blocks fill with ML-DSA signatures; capacity collapses toward
-  ~370 tx/block.
-- **Right gauge — Sigpress:** same transactions, one proof per batch; capacity back toward the ECDSA
-  line, at **[~N]** tx/block.
-- Then we flip one bit in one signature in a batch, and **the whole batch is rejected on chain.**
+**The timing window is open now.** A year ago no hash-based STARK verifier ran in the EVM; the tooling
+(leanVM, WHIR, sol-whir) only reached feasibility in 2026 — which this project just demonstrated on
+Monad testnet. Once chains ship PQ aggregation natively it becomes table stakes. The window to be first,
+and to shape the standard, is short and open today.
 
-### 4. Why this is real, not a slide
+**The downside is already useful.** Even if the full validity-proof path slips, the optimistic version
+is live and delivers a 2.3× byte reduction with real PQ signatures on Monad now. This is not a bet that
+pays only on a research breakthrough — it ships value at every stage.
 
-- **It rides existing rails.** [ERC-4337](https://eips.ethereum.org/EIPS/eip-7766) EntryPoint (v0.8;
-  v0.9 adds `IAggregator`/`handleAggregatedOps` with a caller fix) already defines signature
-  aggregators, and Alchemy's **Rundler** bundler ships the aggregator code path. No fork, no new
-  precompile.
-- **The Ethereum Foundation proposed exactly this — as a *future protocol change*.**
-  [EIP-8288](https://eips.ethereum.org/EIPS/eip-8288) "In-mempool signature and proof aggregation"
-  (Vitalik Buterin & Thomas Coratger, Draft, 3 Jun 2026) folds a block's PQ signatures (leanSPHINCS) and
-  STARKs into one recursive STARK — but it is consensus-breaking and requires frame transactions
-  (EIP-8141). We ship the working version at the **app layer**, on the chain that needs it now.
-- **The standard for this was withdrawn for lack of a scheme worth aggregating.**
-  [ERC-7766](https://eips.ethereum.org/EIPS/eip-7766) was withdrawn: *"No production adoption of
-  aggregateable signature schemes."* Post-quantum signatures are that scheme.
-- **Monad, not Ethereum, is where it pays.** Falcon-aggregation analysis by
-  [Sanso, Thiery & Wagner](https://ethresear.ch/t/revisiting-falcon-signature-aggregation-for-pq-mempools/24431)
-  (18 Mar 2026) puts break-even at ~200 signatures per batch; a single Monad block can hold far more
-  than that.
+## 3. Why only Monad — and not any other ecosystem
 
-### Why it fits Monad specifically (and not Ethereum)
+Three reasons, each now backed by a measurement, not a claim:
 
-1. **The byte budget *is* the product.** Monad sells throughput squeezed from a 1.5 MB / 3,750-tx /
-   300 ms block ([MIP-12](https://mips.monad.xyz/MIPs/MIP-12)). PQ signatures are 10-120x bigger than
-   ECDSA, so they consume that budget and cut capacity ~85-95%. On a low-throughput chain nobody
-   notices signature bytes; on Monad they are the binding constraint — which is exactly what
-   aggregation removes. (Aggregation pays only above ~200 sigs/batch; a Monad block holds far more.)
-2. **The verifier is affordable *and* fits.** The on-chain STARK verifier is the hard, expensive part
-   (est. 5-20M gas, measured in K4). Monad gives **30M gas per transaction** (Ethereum: 30M per
-   *block*) and a **128 KB contract-size limit** ([MIP-2](https://mips.monad.xyz/MIPs/MIP-2); Ethereum
-   caps contracts at 24 KB). The verifier fits one Monad contract and one transaction for cents; on
-   Ethereum mainnet it would cost tens of dollars and might not fit under 24 KB.
-3. **The rails and the roadmap gap are already here.** ERC-4337 EntryPoints (v0.6-v0.8) with
-   `IAggregator`/`handleAggregatedOps`, EIP-7702, and a P-256 precompile are deployed — so the
-   aggregator plugs in with no fork. Monad has publicly committed to a PQ roadmap that makes accounts
-   quantum-safe but never addresses signature size, and *Quantum Cadence* abandoned PQ aggregation at
-   consensus — an acknowledged gap to fill now, with a native path later.
+1. **The byte budget is Monad's product.** Throughput squeezed from 1.5 MB / 3,750 tx / 300 ms is the
+   whole pitch of the chain, so signature bytes are the *binding constraint* — exactly what aggregation
+   removes. On a low-throughput L1 nobody notices signature size, so nobody needs this. Aggregation pays
+   above ~200 sigs/batch ([Sanso, Thiery & Wagner](https://ethresear.ch/t/revisiting-falcon-signature-aggregation-for-pq-mempools/24431));
+   a Monad block holds far more.
+2. **The verifier fits *and* is affordable — measured.** Our hash-based STARK verifier is **62.7 KB**: it
+   deploys under Monad's **128 KB** contract limit ([MIP-2](https://mips.monad.xyz/MIPs/MIP-2)) but
+   **would not deploy on Ethereum** (24 KB). Verifying a proof cost **~12.84M gas** in one transaction on
+   Monad testnet — Monad gives **30M gas per transaction** (Ethereum: 30M per *block*), so it's cents
+   here and tens of dollars, if it fit at all, on Ethereum mainnet.
+3. **The rails and the gap are already on Monad.** ERC-4337 EntryPoints (v0.6–v0.8), EIP-7702 and a P-256
+   precompile are deployed, so the aggregator plugs in with no fork. Monad has publicly committed to a PQ
+   roadmap that leaves the size question open. The Ethereum version of this idea,
+   [EIP-8288](https://eips.ethereum.org/EIPS/eip-8288) (Buterin & Coratger, Draft), is a *consensus-breaking
+   protocol change* that requires frame transactions (EIP-8141) and does not exist yet. We ship at the
+   **app layer, on the chain that needs it, today.** And [ERC-7766](https://eips.ethereum.org/EIPS/eip-7766)
+   (signature aggregation for 4337) was *withdrawn* for "no production adoption of aggregateable signature
+   schemes" — post-quantum is that scheme.
 
-   By contrast, EIP-8288 is this same idea for Ethereum, but it needs a consensus-breaking protocol
-   change, and Ethereum's gas plus 24 KB code limit make an app-layer verifier impractical. Monad lets
-   us ship it at the app layer today.
+## 4. The efforts — what's built and measured (all on Monad testnet)
 
-### 5. What we measured (fill in from the kill tests)
+**Optimistic lane — live end to end:**
+- **Naive PQ baseline:** one WOTS (hash-based) signature verified fully on chain — **118,606 gas, 2,276 B**.
+- **Sigpress batch:** 256 ops folded into one 32-byte Merkle root — **102,063 gas, 0.89 bytes/op**.
+- **The kill shot:** one tampered signature → `challenge` → **bond slashed, batch rejected on chain**.
+- **PQ accounts:** ERC-4337-style accounts execute transfers only from a finalized batch, key rotating
+  per op — **~134,634 gas/execute**.
+- **Standard 4337 holds (K8):** a 4-op aggregated bundle runs through `handleAggregatedOps` on the real
+  v0.8 EntryPoint on Monad testnet (**828,003 gas**), via a custom `IAggregator`.
 
-- **Prior art, self-reported:** the EF's [leanMultisig](https://github.com/leanEthereum/leanMultisig)
-  aggregates 1,400 leanXMSS signatures into a 359.5 KiB proof (**~263 bytes/signature**) in 1.15 s on
-  an Apple M4 Max, verifying in 7.45 ms — "not yet production ready," 192-bit binary tower field with
-  WHIR, no EVM verifier yet.
-- **Ours, to measure (K4/K5/K9):**
-  - Proof size: **[__]** KiB for **[__]** signatures → **[__]** bytes/signature.
-  - Verification on Monad testnet: **[__]** gas (cap 30M), ≈ **[__]** USD per batch, **[__]** USD per
-    user operation.
-  - Proving: **[__]** signatures/second on **[hardware]**; added latency **[__]** s.
+**Validity-proof path — proven feasible:**
+- **Verifier (K4):** a hash-based STARK verifier (sol-spartan-whir, KoalaBear + Keccak, no pairings,
+  no Poseidon in the EVM) deployed on Monad testnet and **verified a proof in one tx at ~12.84M gas**;
+  a 1-bit-tampered proof reverts (`MERKLE_ROOT`).
+- **Prover (K5):** leanVM aggregates **1,024 leanXMSS signatures → 326 B/sig** in **2.29 s** (verify
+  9.5 ms); 4×1,024 recursion reaches **~61 B/sig**. Comfortably under the 400 B/sig and 3 s bars.
 
-### 6. Where it goes
+## 5. The gap and the unknowns (said before anyone asks)
 
-- **Now:** post-quantum ERC-4337 smart accounts for Monad wallets and high-frequency apps, at
-  classical-like block cost.
-- **Next:** a shared verification service — any app's hash-based signatures or STARKs folded into the
-  same proof (EIP-8288's dependency model, built at the app layer).
-- **Then:** native. The verifier and bundle format become a reference for Monad adding aggregation to
-  its protocol — the size answer its PQ roadmap and *Quantum Cadence* are both missing.
+**The one real gap:** the two halves of the validity path aren't joined yet. K4 verified the *authors'
+fixture* proof; K5's signature proof lives in a 192-bit binary field the EVM **cannot verify directly**
+(K6: >100M gas — the EVM has no carry-less multiply). The only EVM-viable route is to **recurse the
+signature proof down to a KoalaBear+Keccak "terminal" proof** that the deployed verifier accepts. That
+works structurally — but:
 
-### 7. Honest limits, said before anyone asks
+- **The terminal prover is not public** (the repos reference an external `../leanVM` workspace). This is
+  the top risk: the go/no-go has moved from "is it affordable?" (answered: yes) to "can we obtain/rebuild
+  the prover?" Estimate: **1–2 weeks if obtainable, 4+ weeks otherwise.**
+- **Binding + scheme alignment:** the terminal's public input must be bound to our batch root; the
+  Solidity terminal targets KoalaBear-era leanVM while leanVM main is binary-field; and our on-chain
+  scheme is WOTS, not leanXMSS. These must be reconciled.
+- **K9 (bytes/op) fails its 1.5× target, non-fatally:** the 4337 path is 990 B/op — 2.3× *smaller* than
+  naive PQ but 2.5× *bigger* than a normal Monad tx, because of ABI padding and Merkle proofs, not the
+  signature. Fix: a compact bundle format (~2 weeks).
+- **Latency:** proving ~2.3 s > a 300 ms block, so batches span blocks; single-op verification is always
+  available as a fallback.
+- **Licences (checked):** leanMultisig/Plonky3/Stwo are MIT/Apache; but sol-whir pulls in GPL-3.0
+  `solidity-bn254`, sol-spartan-whir has **no LICENSE file** (README says MIT), and eth-infinitism is
+  GPL-3.0 — so our 4337 interfaces were written fresh (MIT) and nothing GPL is copied. A clean licence is
+  required before reusing the verifier.
+- **Bundler/mempool:** the on-chain path works, but no third-party bundler (Rundler) or hosted Monad
+  bundler has accepted ops for our aggregator yet; v0.9 untested.
+- **Stateful keys:** WOTS/XMSS one-time keys must never be reused; the wallet rotates per op.
 
-- **Latency.** Proving takes about a second — longer than a 300 ms block — so a batch spans a few
-  blocks. A single operation can always be verified alone, at full size, as a fallback. [added latency
-  to measure in K5]
-- **Stateful keys.** Hash-based keys sign a bounded number of messages and must never reuse a one-time
-  key. The wallet persists the key index before signing (the RLN-slot lesson).
-- **Bytes saved are signature bytes.** A UserOperation still carries sender, nonce, callData and gas
-  fields. The goal is "a post-quantum operation costs about what a classical transaction costs today"
-  — K9 measures the real per-operation overhead.
-- **The outer transaction is still ECDSA.** The bundler signs it classically until Monad's native PQ
-  accounts land. A broken bundler key cannot move user funds (users authorise with PQ signatures) but
-  it could censor or stall a batch.
-- **Research-grade parts.** leanMultisig is "not yet production ready" and its numbers are
-  self-reported; no on-chain verifier exists for these proofs yet (that is kill test K4, the go/no-go).
+## 6. What can be done next
+
+- **Now (shipped):** optimistic PQ aggregation + PQ 4337 accounts, live on testnet.
+- **Days:** compact bundle format to beat the K9 byte target; test a real bundler (Rundler).
+- **1–4 weeks:** obtain/rebuild the terminal prover, bind its public input to our batch root, align the
+  signature scheme → **close the end-to-end validity proof** (prove 1,024 real signatures → terminal
+  proof → verify on Monad in one tx). This is the headline.
+- **Later:** a shared verification service — any app's hash-based signatures or STARKs folded into one
+  proof (EIP-8288's dependency model, at the app layer) — and a reference for Monad adding aggregation
+  natively, the size answer its roadmap and *Quantum Cadence* are missing.
 
 ---
 
 ## 90-second demo script (the four beats)
 
-Full detail in `docs/demo.md`; this is the spoken version.
+Full detail in `docs/demo.md`.
 
-1. **(0:00–0:20) The problem.** "Monad fits ~3,750 transactions in a 1.5 MB block. Switch to the
-   post-quantum scheme in Monad's own account-auth draft and the same block holds about 370 — a 90% cut.
-   Nobody's solved the size problem; Monad's roadmap doesn't even mention it."
-2. **(0:20–0:50) The idea + the money shot.** "Don't put signatures on chain — put one commitment per
-   batch. Here's 256 real post-quantum signatures going on chain as a single 32-byte root." → show the
-   `submitBatch` tx on the testnet explorer: 102,063 gas, **0.89 bytes per operation**.
-3. **(0:50–1:10) The comparison.** Point at the two gauges (labelled *capacity model*): naive PQ fills
-   the block; Sigpress returns it to the tx-count ceiling. Scoreboard: 2,144 B/sig → 0.89 B/op.
-4. **(1:10–1:30) The kill shot.** "Watch what happens to a bad signature." → hit tamper; show the
-   `challenge` tx: **bond slashed, batch rejected on chain.** "One bad signature, the whole batch
-   rejected — on chain, not on trust. Optimistic today; the STARK validity-proof version is the product."
+1. **(0:00–0:20) Problem.** "Monad fits ~3,750 tx in a 1.5 MB block. Switch to the PQ scheme in Monad's
+   own account-auth draft and it holds ~370 — a 90% cut. The roadmap never mentions signature size."
+2. **(0:20–0:50) Idea + money shot.** "Don't put signatures on chain — put one commitment per batch.
+   Here's 256 real PQ signatures as a single 32-byte root." → `submitBatch` tx on the explorer:
+   102,063 gas, **0.89 bytes/op**.
+3. **(0:50–1:10) Comparison.** Two gauges (labelled *capacity model*): naive PQ fills the block; Sigpress
+   returns it to the tx-count ceiling. Scoreboard: 2,144 B/sig → 0.89 B/op.
+4. **(1:10–1:30) Kill shot.** Tamper one signature → `challenge` tx: **bond slashed, batch rejected on
+   chain.** "On chain, not on trust. Optimistic today; the STARK validity proof — verifier already runs
+   on Monad at 12.8M gas — is the product."
 
 ## One-liners for Q&A
 
-- **"Why not just use Falcon? It's smaller."** Falcon-512 is ~666 bytes per signature
-  ([spec](https://en.wikipedia.org/wiki/Falcon_(signature_scheme))) — still ~10x ECDSA and ~1.6x
-  today's 400-byte budget, and it has no aggregation in production. Aggregation fixes size for *any*
-  scheme.
-- **"Isn't this just EIP-8288?"** EIP-8288 is a *Draft design for Ethereum's protocol*; nothing works
-  today, and it needs a consensus-breaking network upgrade. We built it, on Monad, at the app layer,
-  with an on-chain verifier nobody had written.
-- **"What if the aggregator goes down?"** Users fall back to single-signature verification. Slower,
-  never stuck.
-- **"Who runs the prover?"** Anyone. The proof is checked on chain, so a prover can't forge a batch —
-  only refuse to include one.
-- **"Is the proof really quantum-safe?"** Yes — it's a hash-based STARK (collision-resistant hashes +
-  Fiat–Shamir), unlike the Groth16/PLONK SP1 gateways already on Monad, which are pairing-based and
-  *not* post-quantum.
-
----
+- **"Why not just use Falcon? It's smaller."** Falcon-512 is ~666 B/sig — still ~10× ECDSA and ~1.6×
+  today's budget, with no aggregation in production. Aggregation fixes size for *any* scheme.
+- **"Isn't this just EIP-8288?"** EIP-8288 is a Draft *Ethereum protocol* change; nothing works today.
+  We built it on Monad, at the app layer, with an on-chain verifier nobody had written.
+- **"Is the verify number real?"** Yes — ~12.84M gas, one tx, on Monad testnet (tx hash in
+  `decisions.md`); the verifier is 62.7 KB and would not fit Ethereum's 24 KB limit.
+- **"What's not done?"** Joining the live prover to the on-chain verifier for *our* signature statement —
+  blocked on a non-public terminal prover, 1–4 weeks. Everything else is measured and live.
+- **"If the aggregator goes down?"** Single-signature verification fallback — slower, never stuck. A
+  prover can't forge a batch, only refuse to include one.
 
 ## Sources
 
-- Monad limits: [MIP-12](https://mips.monad.xyz/MIPs/MIP-12), [MIP-2](https://mips.monad.xyz/MIPs/MIP-2),
+- Monad: [MIP-12](https://mips.monad.xyz/MIPs/MIP-12), [MIP-2](https://mips.monad.xyz/MIPs/MIP-2),
   [Deployment Summary](https://docs.monad.xyz/developer-essentials/summary),
-  [300 ms blocks](https://monad.xyz/blog/300ms-block-times)
-- Monad PQ: [roadmap](https://monad.xyz/blog/post-quantum-roadmap),
+  [PQ roadmap](https://monad.xyz/blog/post-quantum-roadmap),
   [account-auth draft](https://forum.monad.xyz/t/flexible-and-upgradeable-account-authentication/526),
   [Quantum Cadence](https://arxiv.org/abs/2610.32803)
 - Aggregation: [EIP-8288](https://eips.ethereum.org/EIPS/eip-8288),
@@ -216,3 +208,4 @@ Full detail in `docs/demo.md`; this is the spoken version.
 - Crypto: [FIPS 204 (ML-DSA)](https://csrc.nist.gov/pubs/fips/204/final),
   [FIPS 205 (SLH-DSA)](https://csrc.nist.gov/pubs/fips/205/final),
   [leanMultisig](https://github.com/leanEthereum/leanMultisig)
+- All measured numbers with tx hashes: [`decisions.md`](decisions.md).
