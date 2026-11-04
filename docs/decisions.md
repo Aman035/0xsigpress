@@ -671,3 +671,47 @@ Comparisons:
 - **Decision:** fixes are in, nothing redeployed. Remaining DA limits (an honest funded watcher must be
   online; refunded requests can grief the aggregator) are listed in `docs/security-review.md`. Redeploy
   order is in its "Redeploy checklist".
+
+## STARK path as the default: binding v2 in the product, service and stage (4 Nov 2026)
+
+- **Test:** make the trustless binding-v2 validity path the default: `pnpm validity` with SDK-signed, per-signer
+  messages; a `MODE=validity` service that proves, submits and executes ops; the stage's headline beat; the web page.
+  Optimistic stays as the fallback. Code: `aggregator/src/validity.ts`, `scripts/validity.ts`,
+  `src/service/validity-service.ts`, `contracts/src/ValidityEntry.sol`, K11 `export-batch --per-signer`.
+- **Built:** K11 signer exports per-signer batches (`signers[i].message`; single-message provers refuse them). SDK:
+  `leanxmssSignAsync`, `leanxmssKeygenAsync`, `leanxmssGatePubkey` (SSZ limbs are little-endian, the gate's are
+  big-endian; checked against the xmss crate's `flatten`/SSZ code). `src/validity.ts` drives the binding-v2 prover
+  with the child shape pinned to the deployed verifier (`SIGPRESS_MIN_LOG_ROWS` 18,14,16 / 20,16,18), recomputes the
+  statement with `binding-v2/tools/statement.py`, builds `gate.submit` calldata in TS (byte-equal to
+  `submit_calldata.py` for the n4 run, unit test) and reads Monad revert data over raw JSON-RPC.
+  `ValidityEntry` executes an op only if `gate.accepted(keccak(slot, pubkeys, messages))`, the account's
+  self-registered key is at (side, index), and the message there is `opHash(account, nonce, target, value, data)`
+  with the next nonce; 13 Foundry tests (accept, not accepted, wrong pubkey x2, wrong message, replay x2, unregistered,
+  bad index, EOA key, failing call, only-entry).
+- **Measured, Monad testnet, `pnpm validity` (SHAPE=2x256, wallet K14 `0x8bbF…47FB`, gas price 102 gwei):** 512 fresh
+  SDK keys each signed its own op hash (512 distinct messages); keys 11.4 s, signatures 26.3 s, proof 50.9 s wall
+  (max RSS 6.0 GB). eth_call negatives: tampered proof → `MERKLE_ROOT`; changed message / pubkey, swapped batches,
+  slot + 1 → `RootMismatch`; after submit, replay → `AlreadyAccepted`. **`submit` status 1: est. 14,968,702, charged
+  15,717,137 (30,698 gas/sig), calldata 139,844 B (273.1 B/sig)**, tx
+  `0x58793519fb294680ecd1b69dffe26580bc59e3ac5ddb4c28ceaec1396de99f7b`, gate `0x38eeb174…c697`. (Lower than the
+  README's first n = 256 submit, 15.9M est., which also paid the one-time `prepareShape` midstate.)
+- **Measured, Monad testnet, `VALIDITY=1 pnpm stage` Beat 5 (2 x 1024, pre-built SDK-signed proof):** 2,048 SDK keys
+  43.6 s, 2,048 signatures 107.2 s, proof 62.1 s wall (5.7 GB). Same five negatives revert as above, replay →
+  `AlreadyAccepted`. **`submit` status 1, 2,048 signers, est. 21,147,724, charged 22,205,110 (10,842 gas/sig),
+  calldata 238,052 B (116.2 B/sig)**, tx `0xe68e9e3802e2caf5c929f28f55e1478867a321020372c88afe7ace910c184907`, gate
+  `0x5648caea…a661`. Beats 1-4 in the same run on the redeployed aggregator: submitBatch
+  `0x542a1116…1a8d`, tampered submitBatch `0x68f96f0f…d0d6`, challenge (400k gas cap) `0xbbf16f26…2a38` → slashed.
+- **Measured, local anvil (real prover + real generated verifier, 2 x 256), service `MODE=validity`:** 3 accounts,
+  tampered op → HTTP 400; 3 ops + 509 fillers; proof 55.7 s; `gate.submit` 15,882,913 gas used; `execute` of 3 ops
+  1,345,280 gas used; 103 s POST → executed.
+- **Measured, Monad testnet, service `MODE=validity` (2 x 256):** ValidityEntry `0x75cb16d3…26f2`; 3 demo accounts,
+  tampered op → HTTP 400; 3 ops + 509 fillers proved in 54.3 s; `gate.submit` `0x984ae626…3699` charged 15,681,832;
+  `ValidityEntry.execute` `0x7c7e2107…8845` ran all 3 ops, charged 1,419,789. The service's own first submit was
+  never mined (stuck in an RPC pool; same raw tx re-send refused), so that submit was re-sent by hand with the same
+  nonce and higher fees; `send()` now does that replacement automatically (untested on chain).
+- **Not bound / limits:** unchanged from binding v2 (one verifier per shape, our unreviewed soundness argument, one
+  slot and two batches per proof), plus: account ↔ key is a self-set, never-rotated registry; `execute` re-sends all
+  2N pubkeys + messages (64 B/signer); one op per account per proof; the service's crash safety does not pre-sign txs.
+- **Decision:** the STARK path is the default and the headline. Optimistic stays the fallback (fast confirms, no
+  prover). Next: fixed-shape padding inside one verifier, key rotation in the registry, and an external review of the
+  binding argument.

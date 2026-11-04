@@ -145,9 +145,10 @@ Repo layout:
 | K6 | FAIL direct / PASS via wrap | raw leanVM proof needs binary-field math (>100M gas est.); Keccak-only terminal wrap works (K4) |
 | K8 | PASS | `handleAggregatedOps` on EntryPoint v0.8, 4 PQ ops in one tx |
 | K9 | FAIL via 4337 / **PASS via compact entry** | ~990 B/op via 4337 (UserOp encoding 672 B); **98 B/op** (128 ops, raw tx) via `SigpressEntry` on testnet |
-| K10 | **PASS on Monad testnet** (registrar-trusted binding) | our leanXMSS batches → leanVM → Keccak terminal STARK → generated verifier: **512 sigs in 1 tx, 12.79M gas charged (~25.0k gas/sig), 106,340 B calldata (~208 B/sig)**; fresh proof 60.6 s / ~7 GB RSS on the M4; tampered proof reverts `MERKLE_ROOT` (`pnpm validity`, `VALIDITY=1 pnpm stage`) |
+| K10 | **PASS on Monad testnet, trustless** (binding v2, no registrar; default product path) | **2,048 leanXMSS signers, each over its own message, in 1 tx: 22,205,110 gas charged (10,842 gas/sig), 238,052 B calldata (116.2 B/sig)** (`VALIDITY=1 pnpm stage`, SDK-signed, proof 62.1 s on the M4); 2 × 256 SDK-signed via `pnpm validity`: 15,717,137 charged (30,698 gas/sig, 273.1 B/sig); tampered proof → `MERKLE_ROOT`, changed message / pubkey / swapped batches / slot → `RootMismatch`, replay → `AlreadyAccepted` |
 
-**Go/no-go:** validity-proof version is **go on gas and size**. The critical path is now the terminal
+**Go/no-go (updated 4 Nov 2026):** the STARK validity path is the **default** in the product (`MODE=validity`
+service + `ValidityEntry`) and the stage headline (Beat 5); optimistic is the fallback. Earlier note: validity-proof version was **go on gas and size**. The critical path is now the terminal
 prover (wrap leanVM's proof of our batch into the Keccak terminal format) and binding its public input
 to our batch root. The optimistic version is live today on testnet.
 
@@ -180,6 +181,9 @@ executed), so scripts pass a fixed `CHALLENGE_GAS = 400_000`. Charged challenge 
 | PQAccount4337Factory | [`0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`](https://testnet.monadvision.com/address/0x21d2ee544075fb5da08bc44bd9a68f6d736e6563) |
 | K10 2 × 256 terminal verifier (generated, research) | `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` (not verified: generator has no LICENSE file) |
 | K10 `SigpressTerminalGate` (registrar = validity wallet `0xf379…2311`) | `0xE2BFD06CC8677df23909dD4ee801b2A9D286f119` (`aggregator/deployments-validity.json`) |
+| Binding-v2 verifier 2 × 256 / 2 × 1024 (generated, research) | `0xa43f61c3936dc4d22b471594f99a33eadc7c4abb` / `0xc6304db43e642c0bc43b55f13a3ebe21f336794f` |
+| `SigpressBindV2Gate` 2 × 256 / 2 × 1024 (no registrar) | `0x38eeb174d437c038dd16ca91e682f24cdc71c697` / `0x5648caea56baa011b6685ce091089b561621a661` |
+| `ValidityEntry` (2 × 256 gate; service `MODE=validity`) | `0x75cb16d3ce42883b85b5152147b157a58c0d26f2` (`aggregator/deployments-validity-v2.json`) |
 | K4 STARK verifier (research, not ours) | `0x4fa20bd740deb7969416749dbedb5d8e5b65c4be` (not verified: third-party source without LICENSE file) |
 
 Verify more with: `forge verify-contract <addr> <path:Name> --chain 10143 --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/ [--constructor-args ...]`
