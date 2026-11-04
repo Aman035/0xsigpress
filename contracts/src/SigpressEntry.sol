@@ -34,6 +34,7 @@ contract SigpressEntry {
     error UnknownAccount(uint256 index);
     error RootMismatch();
     error CreateFailed();
+    error NoAccounts();
 
     event AccountCreated(uint256 indexed index, address indexed account, bytes32 pkHash);
     event BundleExecuted(uint256 indexed batchId, uint256 count);
@@ -56,6 +57,7 @@ contract SigpressEntry {
     /// @notice Create one account per key; msg.value is split evenly among them. Returns the first index.
     function createAccounts(bytes32[] calldata pkHashes) external payable returns (uint256 first) {
         uint256 k = pkHashes.length;
+        if (k == 0 && msg.value != 0) revert NoAccounts(); // the entry cannot send ETH back out
         first = accountCount;
         uint256 each = k == 0 ? 0 : msg.value / k;
         bytes memory code = _cloneCode(address(accountImpl));
