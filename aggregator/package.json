@@ -11,7 +11,8 @@
     "demo": "tsx scripts/demo.ts",
     "tamper": "tsx scripts/tamper.ts",
     "execute": "tsx scripts/execute.ts",
-    "stage": "tsx scripts/stage.ts"
+    "stage": "tsx scripts/stage.ts",
+    "aa": "tsx scripts/aa.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
