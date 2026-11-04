@@ -153,8 +153,9 @@ STARK prove many PQ signatures and be checked on Monad in budget?" — is answer
   needs a trustless on-chain link between the proof's public input and the batch.
 - **Per-op messages.** All signers in a batch currently sign one shared message; real operations need a
   distinct per-op message bound into the proof.
-- **Scheme alignment.** The working chain uses Poseidon-based leanXMSS, not our on-chain Keccak WOTS; the
-  two must converge.
+- **Scheme alignment.** The validity lane now proves **SDK-signed** leanXMSS batches (verified on Monad,
+  K11) rather than deterministic test keys — a step toward production keys. Full convergence with our
+  on-chain Keccak WOTS accounts is still open.
 - **Proving speed.** The terminal proof takes ~40–58 s on a 16 GB laptop (~6 GB RSS) — longer than a
   block, so batches span blocks or need better hardware.
 - **K9 (bytes/op): the generic 4337 path missed the 1.5× target (990 B/op) — now fixed.** The compact
