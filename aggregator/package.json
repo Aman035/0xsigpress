@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "naive": "tsx scripts/naive.ts",
     "demo": "tsx scripts/demo.ts",
-    "tamper": "tsx scripts/tamper.ts"
+    "tamper": "tsx scripts/tamper.ts",
+    "execute": "tsx scripts/execute.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
