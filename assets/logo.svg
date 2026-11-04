@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="0xsigpress logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#200052"/>
+      <stop offset="1" stop-color="#0E0B1A"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A08BFF"/>
+      <stop offset="1" stop-color="#836EF9"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- many signatures (left) pressed into one proof (right) -->
+  <g fill="#836EF9">
+    <rect x="72"  y="150" width="96" height="18" rx="9" opacity="0.35"/>
+    <rect x="72"  y="186" width="120" height="18" rx="9" opacity="0.5"/>
+    <rect x="72"  y="222" width="140" height="18" rx="9" opacity="0.7"/>
+    <rect x="72"  y="258" width="140" height="18" rx="9" opacity="0.7"/>
+    <rect x="72"  y="294" width="120" height="18" rx="9" opacity="0.5"/>
+    <rect x="72"  y="330" width="96" height="18" rx="9" opacity="0.35"/>
+  </g>
+  <!-- press arrows -->
+  <path d="M226 196 L262 256 L226 316" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- the single proof block -->
+  <rect x="290" y="150" width="150" height="212" rx="34" fill="url(#core)"/>
+  <text x="365" y="276" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="64" font-weight="700" fill="#0E0B1A">0x</text>
+</svg>

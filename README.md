@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.png" alt="0xsigpress logo" width="120" />
+
 # 0xsigpress
 
 ### Post-quantum signatures without losing Monad's throughput
