@@ -370,3 +370,94 @@ Comparisons:
   exactly two children; on-chain binding of a Poseidon1 root to our batch; 16 GB RAM vs the authors'
   17.8 GB peak. Estimate (not measured): 1-2 weeks. Verifier repos still lack LICENSE files; draft
   request dropped: we build the chain ourselves (no outreach).
+
+## K9 fix — compact entry (`SigpressEntry`) on Monad testnet (4 Nov 2026)
+
+- **Test:** run a whole optimistic batch in **one tx** through our own entry contract with a packed calldata format,
+  instead of ERC-4337 `handleAggregatedOps`, and measure bytes per op on chain. Pass line (from K9): ≤ 1.5x a normal
+  Monad tx, i.e. ≤ 600 B/op against the ~400 B MIP-12 figure.
+- **Design** (`contracts/src/SigpressEntry.sol`, `contracts/src/SigpressAccount.sol`, MIT, written by us):
+  - One bundle = one batch. The entry rebuilds each op's leaf from the bundle and the account's own storage, then
+    **recomputes the batch's Merkle root from all `count` leaves**. It requires the root to match a **finalized,
+    unslashed** batch in an `OptimisticAggregator`, using the existing `batches(id)` getter, so the aggregator is
+    unchanged. A per-batch `executed` flag and a transient-storage reentrancy lock are added. Ops run first and the
+    root is checked last. A mismatch reverts the whole tx.
+  - The binding is the same as `PQAccount`: `leaf = keccak256(pkHash ‖ m ‖ sigHash)`,
+    `m = keccak256(abi.encode(chainId, entry, pkHash, nextPkHash, payloadHash))` and
+    `payloadHash = keccak256(abi.encode(account, nonce, target, value, keccak256(data)))`. `pkHash` and `nonce` come
+    from account storage, so they are implicit and cost no bytes.
+  - Accounts are EIP-1167 clones that the entry deploys with CREATE2 at `salt = index`. The 4-byte account index is
+    turned into an address by hashing, with no registry read. A failing target call does not revert the bundle: the
+    key still rotates and `success = false` is logged. `executeDirect` is a single-op fallback that verifies the WOTS
+    signature on chain.
+  - Calldata = `executeBundle()` selector (4 B) ‖ batchId uint32 ‖ per op: index uint32, target 20 B,
+    valueLen uint8 + value bytes, dataLen uint16 + data, nextPkHash 32 B, sigHash 32 B. A plain transfer of
+    1e14 or 3e12 wei is **97 B per op**.
+  - **What we did not drop, and why.** `nextPkHash` (32 B) stays. Deriving it from an XMSS-style key commitment
+    would save ~32 B/op (to ~65 B). But the challenge path would then have to verify a one-time key's auth path
+    under the account root, which needs a new aggregator challenge type, and we did not build or test that here.
+    `sigHash` (32 B) stays at full length because truncating it would weaken PQ collision resistance.
+- **Tests:** `forge test --match-path test/SigpressEntry.t.sol` gives 14/14. They cover:
+  - happy paths for 4 ops, 64 ops from 64 accounts, and 64 ops from 16 accounts with keys chained inside the bundle;
+  - 7 kinds of tampered op (value, target, data, nextPkHash, sigHash, swapped order, wrong account) that all revert
+    `RootMismatch`, after which the untampered bundle still runs;
+  - replay: the same bundle reverts `AlreadyExecuted`, and the same ops in a fresh batch revert `RootMismatch`
+    because the keys have rotated;
+  - an unfinalized batch and a slashed batch (bad signature challenged) both revert `BatchNotAccepted`;
+  - trailing or truncated bytes, an unknown account index, a wrong signing domain, a failing target, blocked
+    reentrancy, account access control, and `executeDirect`.
+
+  The full `forge test` gives 68/68, including the forked 4337 suite. The TS packer is `aggregator/src/compact.ts`
+  (unit test `test/compact.test.ts`). It was cross-checked end to end against the Solidity on anvil (8 ops) before
+  the testnet run.
+- **Testnet run:** `KEY_VAR=PRIVATE_KEY_K9 pnpm compact` from EOA `0x245D46C4D130bD239f9783caf37b7E174a78CEa3`.
+  - Deployed with `script/DeployCompact.s.sol` (WINDOW 120, bond 0.001 MON):
+    - `OptimisticAggregator` `0xFb23333a49A0421720dDc1e923b2c1698bD25037` (tx `0xaad3fd6034e380290df17d0b6284a7dfe2a22cf07f3208ee8303ac5ae83cff09`)
+    - `SigpressEntry` `0xf4824778dd80470793bB748CBd506b8B5D1fAe77` (tx `0x4408f683e267a5abb809accb30ce28e4402b7343d46dec0b2eeb3283c0585a74`)
+    - `SigpressAccount` implementation `0x4B06951d269908cb56B78FEeF1f3a6D71c7C40d9`
+  - Every bundle below had all N `Executed(success = true)` events, and the recipient balance went up by N × amount.
+
+| N ops (accounts) | executeBundle tx | calldata | raw signed tx | **raw B/op** | calldata B/op | gas estimate | gas charged (= limit) | charged gas/op |
+|---|---|---|---|---|---|---|---|---|
+| 4 (4) | `0xc92563057773e68eaa97283d09291f31ae4747edc93b4abd694e310e89073e8b` | 396 | 512 | **128.0** | 99.0 | 320,230 | 368,264 (×1.15) | 92,066 |
+| 32 (8, 4 ops each) | `0x86c5f0ef13325fb55560f08f56400896429bce74a4abd590c65a99ff61b07569` | 3,112 | 3,228 | **100.9** | 97.3 | 870,348 | 913,865 (×1.05) | 28,558 |
+| 128 (32, 4 ops each) | `0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd` | 12,424 | 12,540 | **98.0** | 97.1 | 3,313,895 | 3,479,589 (×1.05) | 27,184 |
+
+- **How the bytes were measured:** we re-serialised the raw tx from the RPC fields and checked that
+  `keccak256(raw) == tx hash` for every tx. Monad's RPC has no `eth_getRawTransactionByHash`. 6-7% of the calldata is
+  zero bytes, against 77% for the 4337 path.
+- **Per-batch overhead, which the K9 4337 figure also left out:** `submitBatch` is 383 B raw with 111-133k gas, and
+  `finalize` is 149 B with ~78k gas. Including them, the bytes per op are 261 (N = 4), 117.5 (N = 32) and
+  **102.1 (N = 128)**. The charged gas per op is 144,942, 34,475 and **28,663**.
+- **Gas caveats:**
+  - For N = 32 and 128, each account signed 4 ops, so repeat ops hit warm storage. Ops from distinct, cold accounts
+    cost more; at N = 4 that was ~80k estimated per op including the fixed overhead.
+  - Creating an account is a one-off cost of ~89-102k gas charged per account (4 accounts: 407,509; 24: 1,889,749).
+  - A first top-up attempt with a 21k-style 30,000 limit reverted (tx `0xda84377542a510be7c2e181651e9e9f3c315f599a08ae298df2b10322c55f4db`),
+    because the clone's `receive()` delegatecalls. The script now estimates the gas.
+- **Comparison, per op:**
+
+| Path | B/op on chain | vs normal tx (400 B) |
+|---|---|---|
+| Naive on-chain WOTS (measured) | 2,276 | 5.7x |
+| ERC-4337 `handleAggregatedOps`, 4 ops (measured, K9) | 990 | 2.5x |
+| **SigpressEntry, 4 ops (measured)** | **128** | **0.32x** |
+| **SigpressEntry, 128 ops (measured)** | **98.0** (102.1 incl. submit + finalize) | **0.25x** (0.26x) |
+| Normal Monad tx, MIP-12 arithmetic (K1, not measured here) | ~400 | 1x |
+| Measured Monad mainnet average tx (K1) | 1,728 | 4.3x |
+
+  Against the 4337 path the compact entry is **7.7x smaller at 4 ops and 10.1x smaller at 128 ops**. Against naive
+  on-chain PQ it is **23x smaller**. A PQ op now costs fewer bytes on chain than a plain ECDSA transfer: an ECDSA tx
+  carries ~110 B of envelope and signature, and here that cost is paid once per bundle.
+- **Honest limits:**
+  - This is still **optimistic**. The 2,144-B WOTS signatures are not on chain; data availability is the
+    aggregator's job (`out/compact-batch-*.json`), and safety relies on someone challenging within the 120 s window.
+  - One bundle must carry the whole batch, so a batch can execute only once every op's data is available.
+  - A target that burns all forwarded gas can still make the bundle run out of gas, because there is no per-op gas
+    cap yet.
+  - Not an ERC-4337 path, so no bundler or paymaster ecosystem.
+  - Accounts at 0-3 were topped up once by 0.00005 MON on top of their first 0.0005 MON.
+- **Decision: K9 PASS via the compact entry.** At 98-128 B per op it is 0.25-0.32x a normal tx, far under the 1.5x
+  line, and the result holds at every N measured. Keep ERC-4337 only as a compatibility lane (K8). The main
+  bytes-per-op claim in the pitch should use the compact entry: ~98 B/op on chain at N = 128, measured. The
+  remaining 97 B/op is mostly `nextPkHash` + `sigHash` (64 B).
