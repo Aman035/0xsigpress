@@ -1,12 +1,16 @@
 // Watchtower: follows BatchSubmitted on ANY OptimisticAggregator (whoever posted the batch), fetches the
 // batch's signatures from its DA document, verifies every WOTS signature off chain, and calls `challenge`
 // on the first bad one while the window is open (the bond goes to the challenger).
-// If the DA document is missing or does not rebuild the posted root, nobody can challenge that batch: it is
-// logged loudly on every poll until the window closes. That is the optimistic design's DA risk.
+// If the DA document is missing or does not rebuild the posted root, nobody can challenge that batch from
+// off-chain data. The watchtower then forces the data on chain (SR-R1): it calls requestReveal (paying the
+// contract's revealDeposit, refunded when answered) for every leaf (up to REVEAL_MAX), and once a request's
+// reveal deadline passes unanswered it calls slashUnrevealed (half the bond + the deposit to the requester).
+// Answered reveals are checked on chain by the contract itself (an invalid one slashes at once).
 //   pnpm watchtower      env: AGGREGATOR (default: the service deployments' OptimisticAggregator),
 //                        DA_URL (comma-separated base URLs, tried after the event's own http(s) dataURI),
 //                        WATCH_KEY_VAR (key for challenge txs; default KEY_VAR), RPC_URL, FROM_BLOCK,
-//                        POLL_MS (2000), LOG_CHUNK (100 blocks per eth_getLogs), WATCH_STATE (state file)
+//                        POLL_MS (2000), LOG_CHUNK (100 blocks per eth_getLogs), WATCH_STATE (state file),
+//                        REVEAL (1; 0 = only log missing DA), REVEAL_MAX (leaves to demand per batch; default all)
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseEventLogs, type Address, type Hex } from "viem";
@@ -16,7 +20,15 @@ import { checkDA, type DADoc } from "./da.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 import { revertReason } from "./chain.ts";
 
-export type WatchStatus = "open" | "ok" | "challenged" | "slashed" | "closed-unchecked" | "closed";
+export type WatchStatus = "open" | "ok" | "challenged" | "slashed" | "slashed-unrevealed" | "closed-unchecked" | "closed";
+
+/** A reveal request on one leaf (ours, or someone else's we found on chain). */
+export interface WatchedReveal {
+  deadline: bigint;
+  mine: boolean;
+  state: "open" | "answered" | "slashed" | "reclaimed";
+  tx?: Hex;
+}
 
 export interface WatchedBatch {
   id: bigint;
@@ -30,6 +42,7 @@ export interface WatchedBatch {
   lastLoud?: number;
   note?: string;
   challengeTx?: Hex;
+  reveals?: Record<string, WatchedReveal>;
 }
 
 export type WatchEvent =
@@ -39,7 +52,11 @@ export type WatchEvent =
   | { type: "challenged"; id: bigint; index: number; txHash: Hex }
   | { type: "challenge-failed"; id: bigint; index: number; reason: string }
   | { type: "slashed-elsewhere"; id: bigint }
-  | { type: "closed-unchecked"; id: bigint; reason: string };
+  | { type: "closed-unchecked"; id: bigint; reason: string }
+  | { type: "reveal-requested"; id: bigint; index: number; txHash?: Hex; mine: boolean }
+  | { type: "reveal-failed"; id: bigint; index: number; reason: string }
+  | { type: "reveal-answered"; id: bigint; index: number }
+  | { type: "slashed-unrevealed"; id: bigint; index: number; txHash: Hex };
 
 export interface WatchtowerOptions {
   aggregator: Address;
@@ -52,6 +69,10 @@ export interface WatchtowerOptions {
   pollMs?: number;
   logChunk?: number;
   fetchTimeoutMs?: number;
+  /** Demand missing signatures on chain with requestReveal (default true). */
+  reveal?: boolean;
+  /** At most this many leaves are demanded per batch (each locks revealDeposit until answered); default all. */
+  revealMax?: number;
   onEvent?: (e: WatchEvent) => void;
   log?: (msg: string) => void;
 }
@@ -96,6 +117,95 @@ export async function startWatchtower(opts: WatchtowerOptions) {
     return { tried };
   }
 
+  const send = async (functionName: "slashUnrevealed" | "reclaimDeposit", args: readonly [bigint, bigint]) => {
+    await publicClient.simulateContract({ account, address: opts.aggregator, abi: aggregatorAbi, functionName, args });
+    const hash = await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName, args });
+    const r = await publicClient.waitForTransactionReceipt({ hash });
+    if (r.status !== "success") throw new Error(`${functionName} tx reverted ${hash}`);
+    return hash;
+  };
+  const onchainReveal = async (id: bigint, i: number) => {
+    const [requester, deadline, open] = await publicClient.readContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "reveals", args: [id, BigInt(i)] });
+    return { requester, deadline, open };
+  };
+
+  /** DA is missing: demand each leaf's signature on chain (once per leaf). The txs are sent back to back and
+   *  awaited together, so a large batch still fits in a short window. */
+  async function requestReveals(b: WatchedBatch) {
+    b.reveals ??= {};
+    const deposit = await publicClient.readContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "revealDeposit" });
+    const n = Math.min(b.count, opts.revealMax ?? b.count);
+    const sent: { i: number; hash: Hex }[] = [];
+    for (let i = 0; i < n; i++) {
+      if (b.reveals[i]) continue;
+      try {
+        const args = [b.id, BigInt(i)] as const;
+        await publicClient.simulateContract({ account, address: opts.aggregator, abi: aggregatorAbi, functionName: "requestReveal", args, value: deposit });
+        sent.push({ i, hash: await walletClient.writeContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "requestReveal", args, value: deposit }) });
+      } catch (e) {
+        const r = await onchainReveal(b.id, i).catch(() => undefined);
+        if (r && r.requester !== "0x0000000000000000000000000000000000000000") {
+          // someone else asked first: still follow it, so it gets slashed if unanswered
+          b.reveals[i] = { deadline: r.deadline, mine: false, state: r.open ? "open" : "answered" };
+          emit({ type: "reveal-requested", id: b.id, index: i, mine: false });
+          continue;
+        }
+        const reason = revertReason(e);
+        log(`batch ${b.id}: requestReveal of leaf ${i} failed: ${reason}`);
+        emit({ type: "reveal-failed", id: b.id, index: i, reason });
+        break; // window closed, out of funds, ...: retry next poll if still possible
+      }
+    }
+    for (const { i, hash } of sent) {
+      const rc = await publicClient.waitForTransactionReceipt({ hash });
+      if (rc.status !== "success") {
+        emit({ type: "reveal-failed", id: b.id, index: i, reason: `tx reverted ${hash}` });
+        continue;
+      }
+      const r = await onchainReveal(b.id, i);
+      b.reveals[i] = { deadline: r.deadline, mine: true, state: r.open ? "open" : "answered", tx: hash };
+      log(`batch ${b.id}: requested reveal of leaf ${i} (deadline ${r.deadline}) ${txLink(explorer, hash)}`);
+      emit({ type: "reveal-requested", id: b.id, index: i, txHash: hash, mine: true });
+    }
+    save();
+  }
+
+  /** Follow open reveal requests: answered -> done; past deadline -> slashUnrevealed; batch slashed -> reclaim. */
+  async function settleReveals(b: WatchedBatch, now: bigint, slashed: boolean) {
+    for (const [k, r] of Object.entries(b.reveals ?? {})) {
+      if (r.state !== "open") continue;
+      const i = Number(k);
+      const c = await onchainReveal(b.id, i);
+      if (!c.open) {
+        r.state = "answered";
+        log(`batch ${b.id}: leaf ${i} reveal request closed (answered on chain)`);
+        emit({ type: "reveal-answered", id: b.id, index: i });
+        continue;
+      }
+      try {
+        if (slashed) {
+          if (!r.mine) continue;
+          r.tx = await send("reclaimDeposit", [b.id, BigInt(i)]);
+          r.state = "reclaimed";
+          log(`batch ${b.id}: reclaimed reveal deposit for leaf ${i}`);
+        } else if (now >= c.deadline) {
+          const hash = await send("slashUnrevealed", [b.id, BigInt(i)]);
+          r.state = "slashed";
+          r.tx = hash;
+          b.status = "slashed-unrevealed";
+          loud(`batch ${b.id} from ${b.submitter} SLASHED: leaf ${i} was never revealed ${txLink(explorer, hash)}`);
+          emit({ type: "slashed-unrevealed", id: b.id, index: i, txHash: hash });
+          slashed = true;
+        }
+      } catch (e) {
+        log(`batch ${b.id}: settling reveal of leaf ${i} failed: ${revertReason(e)}`);
+      }
+      save();
+    }
+  }
+
+  const pendingReveals = (b: WatchedBatch) => Object.values(b.reveals ?? {}).some((r) => r.state === "open");
+
   async function scan() {
     const latest = await publicClient.getBlockNumber();
     let from = state.nextBlock ?? opts.fromBlock ?? (latest > 1000n ? latest - 1000n : 0n);
@@ -118,6 +228,21 @@ export async function startWatchtower(opts: WatchtowerOptions) {
 
   async function check(b: WatchedBatch, now: bigint) {
     const [, , , , slashed] = await publicClient.readContract({ address: opts.aggregator, abi: aggregatorAbi, functionName: "batches", args: [b.id] });
+    if (pendingReveals(b)) {
+      await settleReveals(b, now, slashed);
+      if (b.status !== "open") return;
+      if (pendingReveals(b)) {
+        if (!slashed) return; // still waiting for answers or deadlines
+      } else if (!slashed && now >= b.deadline) {
+        // every demanded leaf was answered with a signature the contract accepted
+        const all = Object.keys(b.reveals!).length >= b.count;
+        b.status = all ? "closed" : "closed-unchecked";
+        if (all) log(`batch ${b.id}: every leaf was revealed on chain and is valid`);
+        else loud(`DA RISK: batch ${b.id}: only ${Object.keys(b.reveals!).length}/${b.count} leaves were demanded (REVEAL_MAX); the rest finalize unchecked.`);
+        if (!all) emit({ type: "closed-unchecked", id: b.id, reason: "REVEAL_MAX below batch size" });
+        return;
+      }
+    }
     if (slashed) {
       b.status = "slashed";
       emit({ type: "slashed-elsewhere", id: b.id });
@@ -125,6 +250,7 @@ export async function startWatchtower(opts: WatchtowerOptions) {
       return;
     }
     if (now >= b.deadline) {
+      if (b.reveals && Object.keys(b.reveals).length) return; // handled above
       if (b.daMissingSince !== undefined) {
         b.status = "closed-unchecked";
         loud(`DA RISK: batch ${b.id} from ${b.submitter} passed its window WITHOUT its signatures ever being available (${b.note}). It can finalize unchecked.`);
@@ -143,6 +269,7 @@ export async function startWatchtower(opts: WatchtowerOptions) {
         loud(`DA MISSING for batch ${b.id} from ${b.submitter} (${now < b.deadline ? `${b.deadline - now}s of window left` : "window closed"}): ${res.reason}`);
         emit({ type: "da-missing", id: b.id, reason: res.reason });
       }
+      if (opts.reveal !== false) await requestReveals(b);
       return;
     }
     b.daMissingSince = undefined;
@@ -224,6 +351,8 @@ async function main() {
     fromBlock: process.env.FROM_BLOCK ? BigInt(process.env.FROM_BLOCK) : undefined,
     pollMs: process.env.POLL_MS ? Number(process.env.POLL_MS) : undefined,
     logChunk: process.env.LOG_CHUNK ? Number(process.env.LOG_CHUNK) : undefined,
+    reveal: process.env.REVEAL !== "0",
+    revealMax: process.env.REVEAL_MAX ? Number(process.env.REVEAL_MAX) : undefined,
   });
 }
 
