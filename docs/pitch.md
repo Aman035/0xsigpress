@@ -135,9 +135,12 @@ fixture* proof; K5's signature proof lives in a 192-bit binary field the EVM **c
 signature proof down to a KoalaBear+Keccak "terminal" proof** that the deployed verifier accepts. That
 works structurally — but:
 
-- **The terminal prover is not public** (the repos reference an external `../leanVM` workspace). This is
-  the top risk: the go/no-go has moved from "is it affordable?" (answered: yes) to "can we obtain/rebuild
-  the prover?" Estimate: **1–2 weeks if obtainable, 4+ weeks otherwise.**
+- **The terminal prover is found and licensed** (K10): `Client-Side-Proving/leanVM` branch
+  `recursive-verifier`, **Apache-2.0**; it builds and its control chain (guest → lift → node) runs. The
+  top risk — "can we even get a prover?" — is answered *yes*. Remaining: wire our own chain (small XMSS
+  aggregate → lift → Keccak terminal), **regenerate the verifier** (the deployed one pins profile tag
+  `0x57500001`; the prover now emits `0x57500002`), and bind the terminal's Poseidon1 root to our batch.
+  Estimate: **~1–2 weeks** (unmeasured).
 - **Binding + scheme alignment:** the terminal's public input must be bound to our batch root; the
   Solidity terminal targets KoalaBear-era leanVM while leanVM main is binary-field; and our on-chain
   scheme is WOTS, not leanXMSS. These must be reconciled.
@@ -190,8 +193,10 @@ Full detail in `docs/demo.md`.
   We built it on Monad, at the app layer, with an on-chain verifier nobody had written.
 - **"Is the verify number real?"** Yes — ~12.84M gas, one tx, on Monad testnet (tx hash in
   `decisions.md`); the verifier is 62.7 KB and would not fit Ethereum's 24 KB limit.
-- **"What's not done?"** Joining the live prover to the on-chain verifier for *our* signature statement —
-  blocked on a non-public terminal prover, 1–4 weeks. Everything else is measured and live.
+- **"What's not done?"** Joining the prover to the on-chain verifier for *our* signature statement. The
+  terminal prover is now found and Apache-2.0 licensed and runs; what's left is wiring our proof chain,
+  regenerating the verifier for the current profile, and binding to our batch — **~1–2 weeks**. Everything
+  else is measured and live.
 - **"If the aggregator goes down?"** Single-signature verification fallback — slower, never stuck. A
   prover can't forge a batch, only refuse to include one.
 

@@ -115,8 +115,9 @@ already on Monad. ([Why hash-based = quantum-proof, in `pitch.md`.](docs/pitch.m
 ## Honest limits
 
 - **Optimistic today, not yet a validity proof.** Today's on-chain object is a Merkle root + bond with a
-  challenge window. The one-STARK-over-N-signatures version is proven feasible and is the next milestone
-  (it's blocked on a non-public "terminal" prover — see [`docs/pitch.md`](docs/pitch.md) §5).
+  challenge window. The one-STARK-over-N-signatures version is proven feasible and is the next milestone —
+  the terminal prover is now found and Apache-2.0 licensed; wiring our proof chain is ~1–2 weeks (see
+  [`docs/pitch.md`](docs/pitch.md) §5).
 - **Stateful keys.** Hash-based one-time keys must never be reused; the account rotates per op.
 - **Every number** here is measured on testnet (tx hash in [`decisions.md`](docs/decisions.md)) or
   labelled a capacity model.
@@ -131,7 +132,8 @@ already on Monad. ([Why hash-based = quantum-proof, in `pitch.md`.](docs/pitch.m
 | [`docs/idea.md`](docs/idea.md) | What it is, what's new, honest limits |
 | [`docs/demo.md`](docs/demo.md) | The demo script |
 | [`docs/decisions.md`](docs/decisions.md) | Every measured number, with tx hashes |
-| `contracts/` · `aggregator/` · `web/` | Solidity · TS aggregator · demo page |
+| [`docs/sdk.md`](docs/sdk.md) | TS SDK: XMSS accounts + crash-safe key state |
+| `contracts/` · `aggregator/` · `web/` | Solidity · TS aggregator + SDK · demo page |
 
 **Verified contracts (MonadVision / Sourcify):** NaiveLane `0xcFc2…E845` · OptimisticAggregator
 `0xEAA3…2A1E` · PQAccountFactory `0x7335…5442` · SigpressAggregator4337 `0xe686…212e` ·
