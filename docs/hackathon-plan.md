@@ -145,6 +145,7 @@ Repo layout:
 | K6 | FAIL direct / PASS via wrap | raw leanVM proof needs binary-field math (>100M gas est.); Keccak-only terminal wrap works (K4) |
 | K8 | PASS | `handleAggregatedOps` on EntryPoint v0.8, 4 PQ ops in one tx |
 | K9 | FAIL via 4337 / **PASS via compact entry** | ~990 B/op via 4337 (UserOp encoding 672 B); **98 B/op** (128 ops, raw tx) via `SigpressEntry` on testnet |
+| K10 | **PASS on Monad testnet** (registrar-trusted binding) | our leanXMSS batches → leanVM → Keccak terminal STARK → generated verifier: **512 sigs in 1 tx, 12.79M gas charged (~25.0k gas/sig), 106,340 B calldata (~208 B/sig)**; fresh proof 60.6 s / ~7 GB RSS on the M4; tampered proof reverts `MERKLE_ROOT` (`pnpm validity`, `VALIDITY=1 pnpm stage`) |
 
 **Go/no-go:** validity-proof version is **go on gas and size**. The critical path is now the terminal
 prover (wrap leanVM's proof of our batch into the Keccak terminal format) and binding its public input
@@ -159,6 +160,8 @@ to our batch root. The optimistic version is live today on testnet.
 | PQAccountFactory | [`0x7335b48f2d794d4a196618916Ec196a1a1615442`](https://testnet.monadvision.com/address/0x7335b48f2d794d4a196618916Ec196a1a1615442) |
 | SigpressAggregator4337 | [`0xe6869caa26a2581880a8d237c1a1f9a26c6c212e`](https://testnet.monadvision.com/address/0xe6869caa26a2581880a8d237c1a1f9a26c6c212e) |
 | PQAccount4337Factory | [`0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`](https://testnet.monadvision.com/address/0x21d2ee544075fb5da08bc44bd9a68f6d736e6563) |
+| K10 2 × 256 terminal verifier (generated, research) | `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` (not verified: generator has no LICENSE file) |
+| K10 `SigpressTerminalGate` (registrar = validity wallet `0xf379…2311`) | `0xE2BFD06CC8677df23909dD4ee801b2A9D286f119` (`aggregator/deployments-validity.json`) |
 | K4 STARK verifier (research, not ours) | `0x4fa20bd740deb7969416749dbedb5d8e5b65c4be` (not verified: third-party source without LICENSE file) |
 
 Verify more with: `forge verify-contract <addr> <path:Name> --chain 10143 --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/ [--constructor-args ...]`

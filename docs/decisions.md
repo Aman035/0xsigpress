@@ -516,3 +516,25 @@ Comparisons:
   `0xdf9bfc6a96fb36cef902eb9e95a65da4b5a94c8e`: tx `0xe7574c9d313869d10b0b347a29f1f85a4f78f640a4fb2208f66a3e57ed0a84e4`,
   status 1, estimate 12,178,749, charged 12,787,686, `accepted` = true. So one fixed-shape verifier on Monad
   accepts both a full 512-signature batch and a padded 8-signature batch.
+
+## K10 validity lane in the product (`pnpm validity`, stage Beat 5) — 4 Nov 2026
+
+- **Test:** drive the K10 prover from the aggregator for a *fresh* batch pair (new random 32-byte batch
+  roots, 256 leanXMSS signers each, padded to the 2 × 256 shape), check the application root off chain
+  (`tools/app_root.py`), generate calldata, and submit to the deployed 2 × 256 verifier
+  `0xf563bb0b43d6090c89d45a7a780c8ab0175d92d2` through our own gate
+  `0xE2BFD06CC8677df23909dD4ee801b2A9D286f119` (registrar = validity wallet `0xf379…2311`).
+  Code: `aggregator/src/validity.ts`, `aggregator/scripts/validity.ts`, Beat 5 in `aggregator/scripts/stage.ts`.
+- **Measured (Monad testnet):**
+  - `pnpm validity`: prove 82.6 s wall (leanVM proving 73 s, max RSS 5.58 GB, single run with other
+    agents' work on the machine); `submit` tx `0xf08edfa0bfc04cde63e1d9a1e8cefdb31bc5978eef04861d95a31e6b81ef0f18`,
+    estimate 12,201,874, charged 12,811,967, calldata 107,204 B, 512 sigs (25,023 gas/sig); gate deploy
+    `0x82424613…97e8`, register `0x5f5ec545…96c6`.
+  - `VALIDITY=1 pnpm stage` (beats 1-5, second fresh proof, 60.6 s wall, max RSS 7.05 GB): Beat 5 `submit`
+    tx `0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1`, estimate 12,179,291, charged
+    12,788,255, calldata 106,340 B, 512 sigs (24,977 gas/sig, 207.7 B/sig); `accepted` = true.
+  - Both runs: 1 bit flipped at byte 60,000 of the submit calldata → `eth_call` reverts `MERKLE_ROOT`.
+- **Not bound yet:** unchanged from the K10 entry above (registrar-trusted root mapping, signer set
+  hidden in the digest, one shared message per batch, test keys, composition not analysed).
+- **Decision:** the validity lane is runnable from the product scripts and shown on the demo page; the
+  stage demo submits a pre-built proof (proving is ~1 min, ~6-7 GB) and says so on screen.

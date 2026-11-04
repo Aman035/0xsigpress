@@ -153,3 +153,55 @@ BEAT 4  Flip ONE bit in ONE of 256 signatures  [LIVE on Monad testnet]
   estimate, so a fresh naive tx shows ~143k rather than the earlier 118,606 (set without the buffer).
 - This is the **optimistic** path (K7 fallback), not the STARK validity proof: signatures are checked
   off chain and fraud is caught by a bonded challenge within the window.
+
+---
+
+## Beat 5 (optional): the validity proof
+
+Adds the research validity-proof lane (K10-terminal) after the four beats: one Keccak terminal STARK over
+two batches of leanXMSS signatures, verified on Monad testnet by a generated Solidity verifier through
+`SigpressTerminalGate`, in one tx. Proving takes ~60-80 s and ~6-7 GB, so the stage **does not prove
+live**: it submits a proof built beforehand.
+
+```sh
+cd aggregator
+# 1. before the demo: prove a fresh batch (holds the shared prover lock) and submit it once
+KEY_VAR=PRIVATE_KEY_K12 pnpm validity
+#    or only prove, so the stage tx is the proof's first submission:
+PROVE_ONLY=1 pnpm validity
+# 2. on stage: beats 1-4 as usual, then Beat 5 submits the latest proof under out/validity/
+KEY_VAR=PRIVATE_KEY_K12 VALIDITY=1 STEP=1 pnpm stage
+```
+
+| Env var | Meaning |
+|---|---|
+| `VALIDITY=1` | add Beat 5 (default off: beats 1-4 unchanged) |
+| `PROOF_DIR` | proof to submit (a dir with `report.json` + `native/`); default: latest saved by `pnpm validity` |
+| `PER_CHILD` | `pnpm validity` only: signers per batch, 1-256 (padded to the 2 × 256 verifier shape); default 256 |
+| `KEY_VAR` | wallet; `pnpm validity` defaults to `PRIVATE_KEY_K12`. It must be the gate's registrar (a new wallet deploys its own gate, ~0.05 MON) |
+
+Uses the fixed-shape 2 × 256 verifier from `experiments/k10-terminal/deployed-2x256.json` when present,
+else the 2 × 4 one. Each submit costs ~1.3 MON at 102 gwei (~12.2M gas estimate + 5%, and Monad
+charges the limit); the stage checks the balance before Beat 1. Before sending, it `eth_call`s the
+verifier and the gate, so a bad proof never costs a reverted 12M-gas tx.
+
+**Expected output** (testnet run, 4 Nov 2026):
+
+```
+BEAT 5  Validity proof: many PQ signatures, ONE STARK, ONE tx  [LIVE on Monad testnet]
+  512 leanXMSS signatures (2 batches x 256, each batch signs its 32-byte root)
+  proved off chain before the demo (..., 60.6 s wall on a 16 GB M4) — not proved live
+  ✓ gate.submit: verifier ran the full STARK check on chain, accepted=true
+  https://testnet.monadexplorer.com/tx/0xe858415d964a8769f0ce6e2f0122303bb93229521c55b81375403d118574e6a1
+  gas charged 12,788,255 (estimate 12,179,291 + 5%; Monad charges the limit) · calldata 106,340 B
+  per signature: 24,977 gas and 207.7 B
+  tampered proof (1 bit flipped at byte 60,000) via eth_call: REVERTS MERKLE_ROOT
+```
+
+**Say out loud** (the screen prints it too): the proof binds both batches' signer sets, both batch roots
+and the slot inside its application root. **Not bound yet:** the batch root → application root link is
+registered by a trusted registrar (recomputed off chain, not by the contract); the contract never sees
+the public keys; every signer in a batch signs the same 32-byte root, not per-user ops; KoalaBear/Poseidon
+leanXMSS with deterministic test keys, not our `WOTS.sol` accounts; security is the authors' 100-bit
+component targets, full-chain composition not analysed. The tamper check is an `eth_call` (a reverted
+12M-gas tx would cost ~1.3 MON), not a sent tx.
