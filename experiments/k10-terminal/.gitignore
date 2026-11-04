@@ -1,1 +1,4 @@
 vendor/
+runs/*/native/
+__pycache__/
+tools/__pycache__/
