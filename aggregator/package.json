@@ -14,7 +14,9 @@
     "stage": "tsx scripts/stage.ts",
     "aa": "tsx scripts/aa.ts",
     "compact": "tsx scripts/compact.ts",
-    "validity": "tsx scripts/validity.ts"
+    "validity": "tsx scripts/validity.ts",
+    "service": "tsx src/service/server.ts",
+    "watchtower": "tsx src/service/watchtower.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
