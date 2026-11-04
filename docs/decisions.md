@@ -98,6 +98,46 @@ live-mainnet block sampling noted under K1.
   theoretical cap, and ~10k TPS is Monad's *design target*, not sustained mainnet throughput. Still
   TODO: sample a live mainnet block for real avg tx size to state utilisation honestly.
 
+## K1 TODO — mainnet utilisation sample (4 Nov 2026)
+
+- **Test:** what real Monad mainnet blocks use, versus the 1,500,000 B / 3,750 tx caps and the 400 B
+  baseline assumed above.
+- **Method:** `experiments/k1-mainnet/sample.mjs` (read-only, no keys) against `https://rpc.monad.xyz`
+  (public QuickNode endpoint from docs.monad.xyz network-information; `cast chain-id` → 143). 250
+  blocks: 200 spread every 1,426th block over ~24 h (118,997,899 → 119,281,673, 2026-11-03 08:47 →
+  2026-11-04 08:40 UTC) plus 50 contiguous (119,281,674 → 119,281,723). Tx size = exact canonical
+  encoding length per tx from `debug_getRawBlock` (`eth_getRawTransactionByHash` not exposed),
+  cross-checked against `cast tx --raw` on one block (sums equal, 33,865 B).
+- **Measured:**
+
+  | Metric | Value (250 blocks, 5,518 txs) |
+  |---|---|
+  | Tx size avg / p50 / p95 | **1,728 B** / 1,180 B / 4,657 B |
+  | Tx per block avg / p95 / max | **22.1** / 45 / 98 |
+  | Tx bytes per block avg / max | 38,132 B (**2.5%** of cap) / 154,701 B (10.3%) |
+  | Tx count vs 3,750 cap, avg | 0.59% |
+  | Gas charged vs 150M limit, avg / max | 11.9% / 59.5% (gas *limit* sum, Monad charges the limit) |
+  | Live throughput | ~73 tx/s (0.303 s/block measured) |
+  | Tx types | 92.8% type 2, 7.0% legacy, 11 type 1, **1** type 4; 2 `handleOps`, 0 `handleAggregatedOps` |
+
+- **What it does to the capacity table:** real txs are ~4x the 400 B baseline (large calldata,
+  EIP-2930 access lists). At the mean mix the byte cap binds before the tx cap even for ECDSA
+  (868 tx/block, ~2,900 TPS ceiling). Recomputed naive-PQ capacity (tx − 65 B + sig[+pk]):
+  ML-DSA-44 sig-only 367 tx/block (**58% cut**; 67% at median size), ML-DSA-44 sig+pk 278 (**68%**;
+  76% at median), Falcon-512 644 (26%; 34%), SLH-DSA-128s 157 (82%; 87%). Versus the 3,750-tx ceiling
+  the cuts stay 89-96%, but that compares against a 400 B tx that doesn't exist on mainnet.
+- **Decision:** K1 verdict left as PASS (the hook — PQ signatures dominate tx bytes and shrink the
+  ceiling several-fold — holds: ML-DSA adds 2.4-3.7 KB, 59-69% of each PQ tx's bytes). **But the data
+  weakens it:** against the measured tx mix the naive ML-DSA cut is 58-76%, straddling the ≥70% pass
+  line (sig-only at mean mix fails it). Flagged for the user to decide whether to re-score K1.
+- **Pitch implications:** (1) mainnet is at ~2.5% of the byte cap today, so frame the problem as the
+  capacity ceiling Monad is designed to fill, not current congestion; (2) quote "~10k TPS" only as the
+  design target; live is ~70 tx/s; (3) prefer "ML-DSA makes each tx ~2.4-4.1x bigger / cuts the byte
+  ceiling by 58-76% at today's tx mix" over "85-90%"; (4) 4337 and 7702 are almost unused on mainnet
+  (0.04% / 0.02% of txs) — adoption of the aggregator path cannot lean on existing 4337 volume.
+- **Caveats:** one RPC, one 24 h window, 250 blocks; every-Nth sampling can miss bursts; gas is
+  gas charged (limit), not executed.
+
 ## K2 — has anyone shipped PQ aggregation on Monad?
 
 - **Decision: K2 PASS.** No PQ signature aggregator or on-chain aggregation verifier found on Monad,
