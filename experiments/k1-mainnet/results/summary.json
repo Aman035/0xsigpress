@@ -1,0 +1,162 @@
+{
+  "rpc": "https://rpc.monad.xyz",
+  "sampledAt": "2026-11-04T08:41:51.482Z",
+  "latest": 119281723,
+  "windowBlocks": 285346,
+  "step": 1426,
+  "all": {
+    "blocks": 250,
+    "fromBlock": 118997899,
+    "toBlock": 119281723,
+    "fromTime": "2026-11-03T08:47:54.000Z",
+    "toTime": "2026-11-04T08:41:13.000Z",
+    "txs": 5518,
+    "emptyBlocks": 0,
+    "txSize": {
+      "avg": 1727.6379122870605,
+      "p50": 1180,
+      "p95": 4657,
+      "max": 25562
+    },
+    "txPerBlock": {
+      "avg": 22.072,
+      "p50": 19,
+      "p95": 45,
+      "max": 98
+    },
+    "txBytesPerBlock": {
+      "avg": 38132.424,
+      "p95": 84994,
+      "max": 154701
+    },
+    "blockRlpBytes": {
+      "avg": 38849.668,
+      "max": 155636
+    },
+    "pctOfByteCap": {
+      "avg": 2.5421616,
+      "max": 10.3134
+    },
+    "pctOfTxCap": {
+      "avg": 0.5885866666666666,
+      "max": 2.6133333333333333
+    },
+    "gas": {
+      "avgUsed": 17913198.488,
+      "avgLimit": 150000000,
+      "avgPct": 11.942132325333334,
+      "maxPct": 59.47875333333333
+    },
+    "txTypes": {
+      "0": 387,
+      "1": 11,
+      "2": 5119,
+      "4": 1
+    },
+    "handleOps": 2,
+    "handleAggregatedOps": 0
+  },
+  "contiguous": {
+    "blocks": 50,
+    "fromBlock": 119281674,
+    "toBlock": 119281723,
+    "fromTime": "2026-11-04T08:40:58.000Z",
+    "toTime": "2026-11-04T08:41:13.000Z",
+    "txs": 994,
+    "emptyBlocks": 0,
+    "txSize": {
+      "avg": 1798.8450704225352,
+      "p50": 1178,
+      "p95": 5179,
+      "max": 25562
+    },
+    "txPerBlock": {
+      "avg": 19.88,
+      "p50": 19,
+      "p95": 45,
+      "max": 46
+    },
+    "txBytesPerBlock": {
+      "avg": 35761.04,
+      "p95": 79655,
+      "max": 86695
+    },
+    "blockRlpBytes": {
+      "avg": 36471.98,
+      "max": 87481
+    },
+    "pctOfByteCap": {
+      "avg": 2.384069333333333,
+      "max": 5.7796666666666665
+    },
+    "pctOfTxCap": {
+      "avg": 0.5301333333333333,
+      "max": 1.2266666666666666
+    },
+    "gas": {
+      "avgUsed": 15656723.8,
+      "avgLimit": 150000000,
+      "avgPct": 10.437815866666668,
+      "maxPct": 31.754064666666668
+    },
+    "txTypes": {
+      "0": 75,
+      "1": 3,
+      "2": 916
+    },
+    "handleOps": 1,
+    "handleAggregatedOps": 0
+  },
+  "spread": {
+    "blocks": 200,
+    "fromBlock": 118997899,
+    "toBlock": 119281673,
+    "fromTime": "2026-11-03T08:47:54.000Z",
+    "toTime": "2026-11-04T08:40:58.000Z",
+    "txs": 4524,
+    "emptyBlocks": 0,
+    "txSize": {
+      "avg": 1711.9924845269672,
+      "p50": 1274,
+      "p95": 4564,
+      "max": 21082
+    },
+    "txPerBlock": {
+      "avg": 22.62,
+      "p50": 19,
+      "p95": 46,
+      "max": 98
+    },
+    "txBytesPerBlock": {
+      "avg": 38725.27,
+      "p95": 94698,
+      "max": 154701
+    },
+    "blockRlpBytes": {
+      "avg": 39444.09,
+      "max": 155636
+    },
+    "pctOfByteCap": {
+      "avg": 2.5816846666666664,
+      "max": 10.3134
+    },
+    "pctOfTxCap": {
+      "avg": 0.6032,
+      "max": 2.6133333333333333
+    },
+    "gas": {
+      "avgUsed": 18477317.16,
+      "avgLimit": 150000000,
+      "avgPct": 12.318211439999997,
+      "maxPct": 59.47875333333333
+    },
+    "txTypes": {
+      "0": 312,
+      "1": 8,
+      "2": 4203,
+      "4": 1
+    },
+    "handleOps": 1,
+    "handleAggregatedOps": 0
+  }
+}
