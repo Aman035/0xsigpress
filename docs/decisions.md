@@ -344,3 +344,29 @@ Comparisons:
   (KoalaBear + Keccak-256-only terminal, 12.84M gas measured on Monad), whose prover is not public.
   On-chain bytes would then be the constant ~106,628 B terminal (≈104 B/sig at 1,024, unmeasured for
   our statement); the wrap step's prove time is unmeasured. Risk remains prover availability.
+
+## Terminal prover search (K10-terminal, 4 Nov 2026)
+
+- **Test:** find the prover that wraps a leanVM proof into the Keccak terminal format the sol-spartan-whir
+  verifier accepts. Searched alxkzmn's repos and forks, leanEthereum/leanVM branches (incl. `koalabear`),
+  `gh search code/commits`, the sol-spartan-whir scripts. Details and commands: `experiments/k10-terminal/README.md`.
+- **Found:** `Client-Side-Proving/leanVM` branch `recursive-verifier` @ `fb0909d` (Alex Kuzmin, 15 Oct
+  2026), **Apache-2.0** (LICENSE file). `script/run_terminal_fixture.py` -> `leanvm-recursion-profile`
+  writes `native/root-fixture.json`, the input the Solidity generator expects. Chain: guest proof ->
+  lift -> binary-node root proved with the Keccak240 profile; statement = Poseidon1 application root of
+  two children's 8-element digests. Lift/terminal APIs take any child bytecode; the branch also has the
+  KoalaBear XMSS aggregation program.
+- **Measured:** builds (1 min 05 s, pinned nightly-2026-03-04). Control chain (guest -> lift -> node,
+  Poseidon, not Keccak) verifies: 0.62 / 0.74 / 1.51 s, node proof 275,562 B, 1.46 GB RSS. Keccak240
+  execution-proof test passes. Full terminal run not done: needs two distinct client fixtures (only one
+  checked in; generating another needs `ethereum/spartan-whir`, no LICENSE).
+- **Mismatch:** the deployed verifier (`0x4fa20bd7…c4be`, sol-spartan-whir `18eda72`) uses profile tag
+  `0x57500001`; the prover now uses `0x57500002` after a WHIR continuation-claim correction, and
+  upstream sol-whir-p3 dropped the C1 outputs. New proofs will not verify on the deployed contract; a
+  matching verifier must be regenerated per fixture (it pins programs and profile anyway).
+- **Decision:** critical path unblocked on availability and prover licence. Next: our own chain (small
+  XMSS aggregates -> lift -> Keccak terminal -> regenerated C1/grouped verifier on anvil, then Monad).
+  Open, unmeasured: aggregation uses `default_whir_config` vs the lift's explicit profile; root needs
+  exactly two children; on-chain binding of a Poseidon1 root to our batch; 16 GB RAM vs the authors'
+  17.8 GB peak. Estimate (not measured): 1-2 weeks. Verifier repos still lack LICENSE files; draft
+  request in `experiments/k10-terminal/outreach.md` (not sent).
