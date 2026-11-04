@@ -69,22 +69,20 @@ contract ResidualTest is Test {
         assertEq(aggregator.balance, before, "aggregator lost nothing");
     }
 
-    /// SR-R3 (PQAccount / XMSSAccount revert semantics): a failing call reverts the whole op, so the one-time
-    /// key is not rotated and the signed op stays valid. Anyone who saw the signature can run it later, when the
-    /// call would succeed; and the owner's only other way forward is to sign a different message with the same
-    /// one-time WOTS key (key reuse). SigpressAccount does not have this problem (a failed call uses the op up).
-    function test_residual_failedPQAccountOpStaysLive() public {
+    /// SR-R3 (fixed): a failing call no longer reverts the op. The key rotates and the nonce moves (logged as
+    /// ExecutionFailed), so nobody can replay the published signature later when the call would succeed.
+    function test_fixed_failedPQAccountOpIsUsedUp() public {
         bytes32 pk = WOTSHelper.pkHash(seed, 2);
         PQAccount acct = new PQAccount(agg, pk);
         Gate gate = new Gate();
         bytes32 next = WOTSHelper.pkHash(seed, 3);
         bytes memory sig = WOTSHelper.sign(seed, 2, acct.messageFor(next, address(gate), 0, hex"01"));
-        vm.expectRevert(bytes("closed"));
-        acct.executeDirect(next, address(gate), 0, hex"01", sig);
-        assertEq(acct.nonce(), 0);
-        gate.setOpen();
-        vm.prank(thief); // much later, someone else replays the published signature
         acct.executeDirect(next, address(gate), 0, hex"01", sig);
         assertEq(acct.nonce(), 1);
+        assertEq(acct.pkHash(), next);
+        gate.setOpen();
+        vm.prank(thief); // much later, someone else tries to replay the published signature
+        vm.expectRevert(PQAccount.InvalidSignature.selector);
+        acct.executeDirect(next, address(gate), 0, hex"01", sig);
     }
 }
