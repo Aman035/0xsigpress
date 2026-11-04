@@ -8,6 +8,12 @@ Numbers in this pitch are one of two kinds:
   *measure* (proof size for our batch, verification gas on Monad, proving throughput). Never present a
   bracketed number as fact. See `decisions.md` for what has and hasn't been verified.
 
+> **What we shipped at Monad Blitz:** the **optimistic** version — post-quantum end to end, live on Monad
+> testnet, no STARK required. Real WOTS signatures, a 32-byte root per batch (0.89 bytes/op measured),
+> PQ smart accounts executing from finalized batches, and a tamper → challenge → slash path. The
+> **one-hash-based-STARK-over-N-signatures** version below is the product (kill tests K3–K6). So the
+> honest one-line framing is: **optimistic aggregation today, STARK validity proofs next.**
+
 ---
 
 ## The 30-second version
@@ -160,6 +166,22 @@ A load generator fires thousands of quantum-safe transactions.
   self-reported; no on-chain verifier exists for these proofs yet (that is kill test K4, the go/no-go).
 
 ---
+
+## 90-second demo script (the four beats)
+
+Full detail in `docs/demo.md`; this is the spoken version.
+
+1. **(0:00–0:20) The problem.** "Monad fits ~3,750 transactions in a 1.5 MB block. Switch to the
+   post-quantum scheme in Monad's own account-auth draft and the same block holds about 370 — a 90% cut.
+   Nobody's solved the size problem; Monad's roadmap doesn't even mention it."
+2. **(0:20–0:50) The idea + the money shot.** "Don't put signatures on chain — put one commitment per
+   batch. Here's 256 real post-quantum signatures going on chain as a single 32-byte root." → show the
+   `submitBatch` tx on the testnet explorer: 102,063 gas, **0.89 bytes per operation**.
+3. **(0:50–1:10) The comparison.** Point at the two gauges (labelled *capacity model*): naive PQ fills
+   the block; Sigpress returns it to the tx-count ceiling. Scoreboard: 2,144 B/sig → 0.89 B/op.
+4. **(1:10–1:30) The kill shot.** "Watch what happens to a bad signature." → hit tamper; show the
+   `challenge` tx: **bond slashed, batch rejected on chain.** "One bad signature, the whole batch
+   rejected — on chain, not on trust. Optimistic today; the STARK validity-proof version is the product."
 
 ## One-liners for Q&A
 

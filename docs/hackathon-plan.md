@@ -104,18 +104,18 @@ Repo layout:
 
 ## Checklist: Aman (docs, site, pitch)
 
-- [ ] Read `docs/idea.md`, `docs/demo.md`, this file
-- [ ] `README.md`: one-paragraph pitch, how it works (diagram above), how to run, honest limits, licence (MIT)
-- [ ] `web/`: single static page (plain HTML/JS or Vite), two lanes:
+- [x] Read `docs/idea.md`, `docs/demo.md`, this file
+- [x] `README.md`: one-paragraph pitch, how it works (diagram above), how to run, honest limits, licence (MIT)
+- [x] `web/`: single static page (plain HTML/JS or Vite), two lanes:
   - Left "Naive post-quantum": block gauge using K1 numbers (~370-540 tx/block for ML-DSA; 2,144 B/sig for our WOTS)
   - Right "Sigpress": 32-byte root per batch, bytes/op from `results.json`
   - Both gauges **labelled "capacity model"** (see `demo.md`: never fake live TPS)
   - Monad testnet panel: tx links to the explorer (`https://testnet.monadexplorer.com/tx/<hash>`) from `results.json`
   - Scoreboard: bytes/signature, tx/block, gas/batch, gas/op, challenge result
-- [ ] `results.sample.json` (marked sample) so the page works before real numbers land
-- [ ] Deploy page (Vercel or GitHub Pages); put the link in README
-- [ ] Pitch: update `docs/pitch.md` to say "optimistic aggregation today, STARK next"; 5-slide deck or 90-second script following the four beats in `demo.md`
-- [ ] Submission form: repo URL, page URL, contract addresses (from `deployments.json`)
+- [x] `results.sample.json` (marked sample) so the page works before real numbers land
+- [ ] Deploy page (Vercel or GitHub Pages); put the link in README — workflow added at `.github/workflows/pages.yml`; **needs one manual step: repo Settings → Pages → Source = GitHub Actions**
+- [x] Pitch: update `docs/pitch.md` to say "optimistic aggregation today, STARK next"; 5-slide deck or 90-second script following the four beats in `demo.md` (90-second script added)
+- [ ] Submission form: repo URL, page URL, contract addresses (from `deployments.json`) — manual
 
 ## Rules
 
