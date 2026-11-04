@@ -367,6 +367,7 @@ export class Batcher {
         o = { status: "success", gasUsed: 0n }; // executed by someone else (anyone can, from the DA data)
       } else {
         if (!b.executeTx) {
+          await this.markDead(bundle);
           const why = await c.simulateBundle(b.id!, bundle);
           if (why) {
             b.status = "failed";
@@ -390,6 +391,10 @@ export class Batcher {
       }
       const ev = o.executed ?? [];
       for (const op of bundle) {
+        if (op.dead) {
+          Object.assign(op, { status: "failed", via: "bundle", txHash: b.executeTx?.hash, error: "skipped on chain as a dead op: its account moved past this nonce before the bundle ran" });
+          continue;
+        }
         const e = ev.find((x) => eq(x.account, op.account) && x.nonce === op.nonce);
         Object.assign(op, { status: "executed", via: "bundle", txHash: b.executeTx?.hash, callSuccess: e ? e.success : undefined });
       }
@@ -397,6 +402,28 @@ export class Batcher {
       this.save();
       this.log(`batch ${b.key} (id ${b.id}) executed in one tx ${b.executeTx?.hash ?? "(by someone else)"}, gasUsed ${o.gasUsed}`);
     }
+  }
+
+  /**
+   * Mark ops that can no longer run (their account moved past them on chain, e.g. via executeDirect) as dead,
+   * so the bundle sends them as dead-op records and the rest of the batch still executes. Walks each account's
+   * ops in bundle order exactly as SigpressEntry will.
+   */
+  private async markDead(bundle: OpRecord[]) {
+    const st = new Map<string, { pkHash: Hex; nonce: bigint }>();
+    for (const o of bundle) {
+      const k = o.account.toLowerCase();
+      if (!st.has(k)) st.set(k, await this.chain.accountState(o.account));
+      const s = st.get(k)!;
+      if (s.nonce === o.nonce && eq(s.pkHash, o.pkHash)) {
+        o.dead = undefined;
+        st.set(k, { pkHash: o.nextPkHash, nonce: s.nonce + 1n });
+      } else if (s.nonce > o.nonce || (s.nonce === o.nonce && !eq(s.pkHash, o.pkHash))) {
+        o.dead = true;
+        this.log(`op ${o.id.slice(0, 10)} is dead (account at nonce ${s.nonce}); sending it as a dead-op record`);
+      }
+    }
+    this.save();
   }
 
   /** Keep, in order, the ops of one account that chain from its current on-chain key; fail the rest. */

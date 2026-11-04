@@ -3,7 +3,7 @@
 // Every write is signed first and handed back as {hash, raw}; the batcher persists it, then broadcasts.
 import { BaseError, ContractFunctionRevertedError, decodeErrorResult, encodeFunctionData, keccak256, parseAbi, parseEventLogs, type Address, type Hex } from "viem";
 import { aggregatorAbi } from "../abi.ts";
-import { bundleCalldata, entryAbi, sigpressAccountAbi } from "../compact.ts";
+import { bundleCalldata, entryAbi, sigpressAccountAbi, type BundleOp as CompactBundleOp } from "../compact.ts";
 import { getClients } from "../chain.ts";
 import type { OpRecord, SignedTx } from "./types.ts";
 
@@ -28,7 +28,13 @@ export interface TxOutcome {
   executed?: ExecutedEvent[];
 }
 
-export type BundleOp = Pick<OpRecord, "accountIndex" | "target" | "value" | "data" | "nextPkHash" | "sigHash">;
+/** An op as it goes into a bundle; `dead` ops are sent as dead-op records (rebuild the leaf, run nothing). */
+export type BundleOp = Pick<OpRecord, "accountIndex" | "target" | "value" | "data" | "nextPkHash" | "sigHash" | "nonce" | "pkHash" | "dead">;
+
+const toCompact = (o: BundleOp): CompactBundleOp => {
+  const live = { index: o.accountIndex, target: o.target, value: o.value, data: o.data, nextPkHash: o.nextPkHash, sigHash: o.sigHash };
+  return o.dead ? { ...live, dead: true, nonce: o.nonce, pkHash: o.pkHash } : live;
+};
 
 export interface ChainAdapter {
   readonly chainId: number;
@@ -135,7 +141,7 @@ export async function viemChain(opts: { entry: Address; rpc?: string; privateKey
     },
     async simulateBundle(id, ops) {
       try {
-        await publicClient.call({ account, to: entry, data: bundleCalldata(id, ops.map((o) => ({ ...o, index: o.accountIndex }))) });
+        await publicClient.call({ account, to: entry, data: bundleCalldata(id, ops.map(toCompact)) });
         return undefined;
       } catch (e) {
         if (e instanceof BaseError) {
@@ -157,7 +163,7 @@ export async function viemChain(opts: { entry: Address; rpc?: string; privateKey
       return sign(batches, encodeFunctionData({ abi: aggregatorAbi, functionName: "finalize", args: [id] }));
     },
     async signBundle(id, ops) {
-      return sign(entry, bundleCalldata(id, ops.map((o) => ({ ...o, index: o.accountIndex }))));
+      return sign(entry, bundleCalldata(id, ops.map(toCompact)));
     },
     async signDirect(op) {
       return sign(op.account, encodeFunctionData({ abi: directAbi, functionName: "executeDirect", args: [op.nextPkHash, op.target, op.value, op.data, op.sig] }));

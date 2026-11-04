@@ -32,6 +32,8 @@ export interface OpRecord {
   txHash?: Hex;
   callSuccess?: boolean; // the op's own call (a failing call does not revert the bundle)
   error?: string;
+  /** Sent as a dead-op record: its account moved past it before the bundle ran, so it is skipped on chain. */
+  dead?: boolean;
   directTx?: SignedTx;
 }
 
