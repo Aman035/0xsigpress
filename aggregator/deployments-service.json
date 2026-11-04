@@ -1,0 +1,52 @@
+{
+  "chainId": 10143,
+  "batches": "0xe00977ac934bfa7db45f01125756ae01e34bd449",
+  "entry": "0x61fd5c4a628fba5920d23cc31c09b4e828095083",
+  "accountImpl": "0x204D5d348F69979C080aBbbf215a77cEe630e534",
+  "bond": "0.001",
+  "window": 60,
+  "deployer": "0xB746CD15085312d3D3Ca7eD2c6558Ae64533255D",
+  "deployTxs": {
+    "batches": "0xd9854984cca7b65f41afe00c4174e838965c708f4587708aaec10210d65ac83c",
+    "entry": "0x083399f962ec198a16647a063bb133bab6d8a2597117da34efc3ed310ddeb3fe"
+  },
+  "note": "Own instance for the aggregator service: deployed from the contracts at commit cf5e08c (dead-op records and the fixed per-op gas budget), which the deployments-compact.json instance predates.",
+  "explorer": "https://testnet.monadexplorer.com",
+  "runs": [
+    {
+      "at": "2026-11-04T10:47:15.991Z",
+      "ops": 4,
+      "executed": 4,
+      "secondsToExecuted": 74,
+      "createTxs": [
+        "0x2dfb519b3b1f7af95dd0ad94a95c2bef2fcb8bf4163455d6912203ee88f9ab95"
+      ],
+      "badOpRejected": {
+        "status": 400,
+        "error": "invalid WOTS signature for account 0 at nonce 0 (key 0x4e43dbcf0ca5a33608cf6d55b26c807b566a77f137b59ec25c9f38f87e7542fc)"
+      },
+      "batches": [
+        {
+          "id": "0",
+          "count": 4,
+          "status": "executed",
+          "submitTx": "0x1bbe8b0a80f73074efd6dea6255dbbbd42ab64d8fe0a117efa3b174364846c16",
+          "finalizeTx": "0x91554011574afb1ab58475060d3a1317a04797448cc555b7fb05b4ec71f4c11c",
+          "executeTx": "0x458ce3686615c77e33b9b06a451430832cae5b2be089438050a0ec99c46e7868"
+        }
+      ]
+    }
+  ],
+  "tamperRuns": [
+    {
+      "at": "2026-11-04T10:48:19.610Z",
+      "batchId": 1,
+      "leaves": 4,
+      "badIndex": 2,
+      "withheld": false,
+      "submitTx": "0x3132b5e266c013f81d26e256429c9cd916b2af28483ad413104b53a89451d7c1",
+      "slashed": true,
+      "challengeTx": "0x6465442f746b218bc14395100b4481b09f2bc6cccfaf99cf4c57e035af1b94a3"
+    }
+  ]
+}
