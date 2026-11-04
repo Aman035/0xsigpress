@@ -131,7 +131,7 @@ function phases(op){
   const s = op.sign, v = op.view, b = v?.batch || {};
   const at = n => ({pending:0,queued:1,batched:2,finalized:3,executed:4,failed:9})[n] ?? 0;
   const st = v?.status || "queued";
-  const reached = st==="failed" ? 1 : at(st);
+  const reached = st==="executed" ? 5 : st==="failed" ? 1 : at(st);  // executed = all 5 phases done (no lingering spinner)
   const now = Math.floor(Date.now()/1000);
   const left = b.deadline ? Math.max(0, Number(b.deadline) - now) : null;
   const windowRow = (st==="batched" && left!=null)
