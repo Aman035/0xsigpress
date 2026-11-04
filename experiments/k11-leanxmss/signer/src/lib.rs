@@ -237,16 +237,21 @@ pub struct SignatureFile {
 pub struct BatchSigner {
     pub public_key: String,
     pub signature: String,
+    /// Per-signer batch (`export-batch --per-signer`): this signer's own 32-byte message. The K10 binding-v2
+    /// runner (`sigpress-bindv2-terminal`) reads it; the single-message provers here refuse such a batch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
-/// What the provers read: every signer signs the same 32-byte `message` at the same `slot`
-/// (leanVM single-message aggregation).
+/// What the provers read: every signer signs at the same `slot`; either all over the same 32-byte batch-level
+/// `message` (leanVM single-message aggregation), or each over its own `signers[i].message` (per-signer).
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchFile {
     pub schema: String,
     pub scheme: String,
-    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
     pub slot: u32,
     pub signers: Vec<BatchSigner>,
 }
@@ -264,7 +269,10 @@ pub fn read_batch(path: &Path, check: bool) -> Res<Batch> {
     if f.schema != BATCH_SCHEMA || f.scheme != SCHEME {
         return Err(format!("{}: not a {BATCH_SCHEMA} batch for {SCHEME}", path.display()).into());
     }
-    let message = hex32(&f.message)?;
+    if f.signers.iter().any(|s| s.message.is_some()) {
+        return Err(format!("{}: per-signer batch; prove it with the K10 binding-v2 runner (sigpress-bindv2-terminal)", path.display()).into());
+    }
+    let message = hex32(f.message.as_deref().ok_or("batch has no message")?)?;
     let mut raw = Vec::with_capacity(f.signers.len());
     for (i, s) in f.signers.iter().enumerate() {
         let pk = pk_from_hex(&s.public_key)?;

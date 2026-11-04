@@ -82,10 +82,13 @@ enum Cmd {
         #[arg(long)]
         sig: Option<String>,
     },
-    /// Collect signature files over one (message, slot) into a batch file for the provers.
+    /// Collect signature files over one (message, slot) into a batch file for the provers. With
+    /// --per-signer: each signature keeps its own message (all at one slot), for the binding-v2 runner.
     ExportBatch {
-        #[arg(long)]
-        msg: String,
+        #[arg(long, required_unless_present = "per_signer")]
+        msg: Option<String>,
+        #[arg(long, conflicts_with = "msg")]
+        per_signer: bool,
         #[arg(long)]
         slot: u32,
         /// Signature JSON files (from `sign --out`), repeatable.
@@ -234,21 +237,22 @@ fn run(cli: Cli) -> Res<i32> {
                 }
             }
         }
-        Cmd::ExportBatch { msg, slot, sigs, out } => {
-            let message = hex32(&msg)?;
+        Cmd::ExportBatch { msg, per_signer, slot, sigs, out } => {
+            let message = msg.as_deref().map(hex32).transpose()?;
             let mut signers = Vec::new();
             for p in &sigs {
                 let f: SignatureFile = serde_json::from_slice(&fs::read(p)?)?;
                 if f.scheme != SCHEME {
                     return Err(format!("{}: wrong scheme", p.display()).into());
                 }
-                if hex32(&f.message)? != message || f.slot != slot {
+                let m = hex32(&f.message)?;
+                if f.slot != slot || message.is_some_and(|b| b != m) {
                     return Err(format!("{}: signs a different (message, slot)", p.display()).into());
                 }
                 let pk = pk_from_hex(&f.public_key)?;
                 let sig = sig_from_hex(&f.signature)?;
-                xmss::xmss_verify(&pk, slot, &message, &sig).map_err(|e| format!("{}: {e}", p.display()))?;
-                signers.push((pk, sig));
+                xmss::xmss_verify(&pk, slot, &m, &sig).map_err(|e| format!("{}: {e}", p.display()))?;
+                signers.push((pk, sig, m));
             }
             // Canonical order: sorted by public key (the aggregation sorts the same way).
             signers.sort_by(|a, b| a.0.cmp(&b.0));
@@ -263,18 +267,19 @@ fn run(cli: Cli) -> Res<i32> {
             let batch = BatchFile {
                 schema: BATCH_SCHEMA.into(),
                 scheme: SCHEME.into(),
-                message: to_hex(&message),
+                message: message.map(|m| to_hex(&m)),
                 slot,
                 signers: signers
                     .iter()
-                    .map(|(pk, sig)| BatchSigner {
+                    .map(|(pk, sig, m)| BatchSigner {
                         public_key: pk_hex(pk),
                         signature: sig_hex(sig),
+                        message: per_signer.then(|| to_hex(m)),
                     })
                     .collect(),
             };
             write_durable(&out, &serde_json::to_vec(&batch)?, 0o644)?;
-            print(&json!({"signers": n, "message": batch.message, "slot": slot, "bytes": fs::metadata(&out)?.len()}));
+            print(&json!({"signers": n, "message": batch.message, "perSigner": per_signer, "slot": slot, "bytes": fs::metadata(&out)?.len()}));
             Ok(0)
         }
         Cmd::ProveBatch {
