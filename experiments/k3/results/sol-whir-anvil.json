@@ -1,0 +1,10 @@
+{
+ "what": "sol-whir example proof (16 vars, fold 4, ConjectureList, pow 30, rate 1/64, 80-bit) verify tx on local anvil",
+ "txHash": "0xb096e720daf107a9a5940dd10dffb4be07a830435681197ac96ca2468b7e5947",
+ "status": "0x1",
+ "gasUsed": 1135052,
+ "calldataBytes": 28740,
+ "zeroBytes": 3747,
+ "calldataGas_4_16": 414876,
+ "calldataGas_floor40": 1149600
+}
