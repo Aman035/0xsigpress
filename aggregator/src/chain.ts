@@ -47,7 +47,14 @@ export async function getClients() {
     blockExplorers: isMonad ? { default: { name: "Monad Explorer", url: MONAD_EXPLORER } } : undefined,
   });
   const publicClient = createPublicClient({ chain, transport: http(rpc) });
-  const walletClient = createWalletClient({ chain, account, transport: http(rpc) });
+  const raw = createWalletClient({ chain, account, transport: http(rpc) });
+  // Monad's RPC gas estimates can come back too tight (a first-run submitBatch ran out of gas on
+  // testnet), so every contract write gets a 30% gas buffer unless the caller sets gas itself.
+  const writeContract = (async (args: any) => {
+    const gas = args.gas ?? ((await publicClient.estimateContractGas({ ...args, account })) * 13n) / 10n;
+    return raw.writeContract({ ...args, gas });
+  }) as typeof raw.writeContract;
+  const walletClient = { ...raw, writeContract } as typeof raw;
   return { chain, chainId, account, publicClient, walletClient, rpc };
 }
 
