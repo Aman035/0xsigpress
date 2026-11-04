@@ -153,6 +153,24 @@ to our batch root. The optimistic version is live today on testnet.
 
 ## Deployed contracts (Monad testnet, source verified on MonadVision / Sourcify)
 
+**Current (security-fixed, redeployed 4 Nov 2026; bond 0.5 MON, reveal deposit 0.05 MON, window 120 s, reveal window 60 s):**
+
+| Contract | Address |
+|---|---|
+| NaiveLane | [`0xdc851806c0aff142F01aab5d1e278AE59FF49508`](https://testnet.monadvision.com/address/0xdc851806c0aff142F01aab5d1e278AE59FF49508) |
+| OptimisticAggregator (reveal game, half-burn slash) | [`0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978`](https://testnet.monadvision.com/address/0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978) |
+| PQAccountFactory | [`0x6B8A6a5Ac45808C89e6eF372a3822166aF501B5D`](https://testnet.monadvision.com/address/0x6B8A6a5Ac45808C89e6eF372a3822166aF501B5D) |
+| SigpressEntry (compact bundles) | [`0x041734ddcC0320f546F924AD1D3CDC5a023D04e0`](https://testnet.monadvision.com/address/0x041734ddcC0320f546F924AD1D3CDC5a023D04e0) |
+| SigpressAggregator4337 | [`0x92453F8fAF396840ADcCE4E7fc22a1d7Ef5D0bE6`](https://testnet.monadvision.com/address/0x92453F8fAF396840ADcCE4E7fc22a1d7Ef5D0bE6) |
+| PQAccount4337Factory | [`0x5114eB07DF21D1e567e6281A489EBAb14E5880c6`](https://testnet.monadvision.com/address/0x5114eB07DF21D1e567e6281A489EBAb14E5880c6) |
+| STARK validity gate v2, 2 × 1024 (trustless binding) | `0x5648caea56baa011b6685ce091089b561621a661` (verifier `0xc6304db43e642c0bc43b55f13a3ebe21f336794f`) |
+| STARK validity gate v2, 2 × 256 | `0x38eeb174d437c038dd16ca91e682f24cdc71c697` (verifier `0xa43f61c3936dc4d22b471594f99a33eadc7c4abb`) |
+
+Gas note: Monad's `eth_estimateGas` overshoots `challenge`/`reveal` ~15x on these contracts (2.5M vs ≤188k
+executed), so scripts pass a fixed `CHALLENGE_GAS = 400_000`. Charged challenge on testnet: 400,000 gas.
+
+**Earlier deployment (pre-fix, kept for the tx history in `decisions.md`):**
+
 | Contract | Address |
 |---|---|
 | NaiveLane | [`0xcFc286564ed4281E200c6D052f9E1A932b31E845`](https://testnet.monadvision.com/address/0xcFc286564ed4281E200c6D052f9E1A932b31E845) |

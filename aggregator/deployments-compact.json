@@ -1,52 +1,56 @@
 {
   "chainId": 10143,
-  "batches": "0xFb23333a49A0421720dDc1e923b2c1698bD25037",
-  "entry": "0xf4824778dd80470793bB748CBd506b8B5D1fAe77",
-  "accountImpl": "0x4B06951d269908cb56B78FEeF1f3a6D71c7C40d9",
-  "bond": "0.001",
-  "window": 120,
-  "deployTxs": {
-    "batches": "0xaad3fd6034e380290df17d0b6284a7dfe2a22cf07f3208ee8303ac5ae83cff09",
-    "entry": "0x4408f683e267a5abb809accb30ce28e4402b7343d46dec0b2eeb3283c0585a74"
-  },
   "explorer": "https://testnet.monadexplorer.com",
-  "accounts": 32,
-  "runs": {
-    "4": {
-      "batchId": 0,
-      "accounts": 4,
-      "createTx": "0xfa0e0a81851340033651c2059a4a6586714e8984b2e4b4e1d557beb23525b0c3",
-      "submitTx": "0x4dafd9aaec37ee109d711ce81fd6c09770b8e801eaca4f229a76916347476071",
-      "finalizeTx": "0x76704b7105680788b98753e44f445ff88618774ef55150b6daa7e5f6e6ae2b73",
-      "executeBundleTx": "0xc92563057773e68eaa97283d09291f31ae4747edc93b4abd694e310e89073e8b",
-      "rawTxBytes": 512,
-      "rawTxBytesPerOp": 128,
-      "gasCharged": 368264,
-      "gasEstimate": 320230
-    },
-    "32": {
-      "batchId": 1,
-      "accounts": 8,
-      "createTx": "0xdca7b2d3e424eb4a037f26fdf635c65f8c2cd2da791590531cb0d717fe28c9fc",
-      "submitTx": "0x1d73648f4fa3118a1cc81ca2c7ce6f8659db9a6d6bb9e908e915449daed2d777",
-      "finalizeTx": "0x6cd67bfa0f243b713fdb8cc427c1dda5a441b813edbdcb25eda6e24111035ea3",
-      "executeBundleTx": "0x86c5f0ef13325fb55560f08f56400896429bce74a4abd590c65a99ff61b07569",
-      "rawTxBytes": 3228,
-      "rawTxBytesPerOp": 100.9,
-      "gasCharged": 913865,
-      "gasEstimate": 870348
-    },
-    "128": {
-      "batchId": 2,
-      "accounts": 32,
-      "createTx": "0x0eb6ec34f293e84057fbb4decfe63afd808cb1e77dbdff6e073b47914aa55c5e",
-      "submitTx": "0x41a95609e27885250959420eea5757df2c4c944f2a98ecc9f01db708776a9247",
-      "finalizeTx": "0xc109e985e6c8ecb79b017aa8d88f1d8e48ec31a764d5f61f7ea414f07aa5f09b",
-      "executeBundleTx": "0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd",
-      "rawTxBytes": 12540,
-      "rawTxBytesPerOp": 98.0,
-      "gasCharged": 3479589,
-      "gasEstimate": 3313895
+  "batches": "0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978",
+  "entry": "0x041734ddcC0320f546F924AD1D3CDC5a023D04e0",
+  "accountImpl": "0x5BcD104747719E9ac35e4b673b4CA157A2CB5eEf",
+  "bond": "500000000000000000",
+  "window": 120,
+  "revealDeposit": "50000000000000000",
+  "revealWindow": 60,
+  "accounts": {},
+  "deployTxs": {},
+  "runs": {},
+  "previous": {
+    "entry": "0xf4824778dd80470793bB748CBd506b8B5D1fAe77",
+    "batches": "0xFb23333a49A0421720dDc1e923b2c1698bD25037",
+    "runs": {
+      "4": {
+        "batchId": 0,
+        "accounts": 4,
+        "createTx": "0xfa0e0a81851340033651c2059a4a6586714e8984b2e4b4e1d557beb23525b0c3",
+        "submitTx": "0x4dafd9aaec37ee109d711ce81fd6c09770b8e801eaca4f229a76916347476071",
+        "finalizeTx": "0x76704b7105680788b98753e44f445ff88618774ef55150b6daa7e5f6e6ae2b73",
+        "executeBundleTx": "0xc92563057773e68eaa97283d09291f31ae4747edc93b4abd694e310e89073e8b",
+        "rawTxBytes": 512,
+        "rawTxBytesPerOp": 128,
+        "gasCharged": 368264,
+        "gasEstimate": 320230
+      },
+      "32": {
+        "batchId": 1,
+        "accounts": 8,
+        "createTx": "0xdca7b2d3e424eb4a037f26fdf635c65f8c2cd2da791590531cb0d717fe28c9fc",
+        "submitTx": "0x1d73648f4fa3118a1cc81ca2c7ce6f8659db9a6d6bb9e908e915449daed2d777",
+        "finalizeTx": "0x6cd67bfa0f243b713fdb8cc427c1dda5a441b813edbdcb25eda6e24111035ea3",
+        "executeBundleTx": "0x86c5f0ef13325fb55560f08f56400896429bce74a4abd590c65a99ff61b07569",
+        "rawTxBytes": 3228,
+        "rawTxBytesPerOp": 100.9,
+        "gasCharged": 913865,
+        "gasEstimate": 870348
+      },
+      "128": {
+        "batchId": 2,
+        "accounts": 32,
+        "createTx": "0x0eb6ec34f293e84057fbb4decfe63afd808cb1e77dbdff6e073b47914aa55c5e",
+        "submitTx": "0x41a95609e27885250959420eea5757df2c4c944f2a98ecc9f01db708776a9247",
+        "finalizeTx": "0xc109e985e6c8ecb79b017aa8d88f1d8e48ec31a764d5f61f7ea414f07aa5f09b",
+        "executeBundleTx": "0xf37a32806cda56f3493d2880bf181df2abf0c084e2894e87dca7edd7df1defbd",
+        "rawTxBytes": 12540,
+        "rawTxBytesPerOp": 98.0,
+        "gasCharged": 3479589,
+        "gasEstimate": 3313895
+      }
     }
   }
 }

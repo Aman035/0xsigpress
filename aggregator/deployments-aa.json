@@ -1,12 +1,18 @@
 {
   "chainId": 10143,
   "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
-  "batches": "0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E",
-  "aggregator4337": "0xe6869caa26a2581880a8d237c1a1f9a26c6c212e",
-  "factory4337": "0x21d2ee544075fb5da08bc44bd9a68f6d736e6563",
-  "deployTxs": {
-    "aggregator4337": "0x56e4ab3301fd88dae4a0c508f8f7ef3a44a958e337369f374aa228d93b62ed83",
-    "factory4337": "0x75a03fc1a9c928f59e09941e4aeb0960099d1e71b29ae1aa8791d1ca1f64aa76"
-  },
-  "explorer": "https://testnet.monadexplorer.com"
+  "batches": "0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978",
+  "aggregator4337": "0x92453F8fAF396840ADcCE4E7fc22a1d7Ef5D0bE6",
+  "factory4337": "0x5114eB07DF21D1e567e6281A489EBAb14E5880c6",
+  "deployTxs": {},
+  "explorer": "https://testnet.monadexplorer.com",
+  "previous": {
+    "batches": "0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E",
+    "aggregator4337": "0xe6869caa26a2581880a8d237c1a1f9a26c6c212e",
+    "factory4337": "0x21d2ee544075fb5da08bc44bd9a68f6d736e6563",
+    "deployTxs": {
+      "aggregator4337": "0x56e4ab3301fd88dae4a0c508f8f7ef3a44a958e337369f374aa228d93b62ed83",
+      "factory4337": "0x75a03fc1a9c928f59e09941e4aeb0960099d1e71b29ae1aa8791d1ca1f64aa76"
+    }
+  }
 }
