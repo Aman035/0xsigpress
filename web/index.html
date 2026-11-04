@@ -306,7 +306,7 @@ function paintStatic(res){
 
   const limits = [
     "Binding is now trustless: the contract recomputes the batch from the signers and their per-operation messages on chain, no trusted helper.",
-    "The on-chain binding hash is still expensive, so about 105 signers fit in one transaction today.",
+    "Binding now scales: 2,048 signatures with distinct messages verify in one Monad transaction (binding v2, ~3.2k gas per signer).",
     "The prototype uses a research key format, not our production post-quantum accounts yet.",
     "Proving a batch takes about a minute, so the live product path stays the optimistic one for now."
   ];

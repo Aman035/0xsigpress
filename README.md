@@ -151,10 +151,10 @@ flowchart LR
 - **The validity proof is a working prototype, not the shipped path yet.** It already verifies real
   signature batches on Monad, and it now binds trustlessly: the contract recomputes the batch from the
   signers and their per-operation messages on chain (no trusted helper), and swapped batches, changed
-  messages or tampered proofs revert. What still needs hardening is scale and production fit: the on-chain
-  binding hash is expensive (about 105 signers per transaction today), the prototype still uses a research
-  key format rather than our production accounts, and proving a batch takes about a minute. Until those
-  close, the live product path stays the simpler optimistic one.
+  messages or tampered proofs revert. It also scales: binding v2 verifies **2,048 signatures with distinct
+  messages in one Monad transaction** (~3.2k gas per signer). What still needs hardening is production fit:
+  the prototype uses a research key format rather than our production accounts, and proving a batch takes
+  about a minute. Until those close, the live product path stays the simpler optimistic one.
 - **Keys are single-use.** Hash-based signatures use one-time keys, so the wallet rotates to a fresh key
   on every operation and never reuses one.
 - **Every figure is real.** Each number is measured on Monad testnet with a transaction you can open, or

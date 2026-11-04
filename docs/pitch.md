@@ -8,8 +8,8 @@ tx hash in `decisions.md`). Where something is an estimate, it says so.
 > **One-line framing:** optimistic aggregation is **live on Monad testnet today**, and the hash-based-STARK
 > validity proof **now runs end to end on our own signatures**: leanXMSS batches → leanVM → Keccak
 > terminal proof → **verified on Monad in one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). Trustless
-> binding and per-signer messages now work on Monad too; remaining is scale (binding-hash cost) and
-> production-key convergence. See §3 (efforts) and §4 (unknowns).
+> binding and per-signer messages now work on Monad at scale (binding v2: 2,048 signatures in one tx);
+> remaining is production-key convergence and proving speed. See §3 (efforts) and §4 (unknowns).
 
 ---
 
@@ -156,9 +156,9 @@ STARK prove many PQ signatures and be checked on Monad in budget?" — is answer
   registrar**. Swapped roots, changed messages or changed pubkeys revert (`RootMismatch`), tampered
   proofs revert (`MERKLE_ROOT`), and replays are rejected (`AlreadyAccepted`). Verified on Monad at small
   N (2×4 signatures, 8 distinct messages).
-- **Binding cost is the new bottleneck.** The on-chain hash that does the binding (Poseidon in Solidity)
-  costs ~160k gas per signer, so a bound batch fits ~105 signers per tx under the 30M cap today — fine
-  for the demo, not yet for scale; a cheaper on-chain hash is the next step.
+- **Binding now scales (binding v2).** A keccak-challenge polynomial binding cut the cost from ~160k to
+  **~3.2k gas per signer**, so **2,048 signatures with distinct messages verify on Monad in one tx
+  (~23.2M gas)** — not ~105. (Soundness is a Schwartz–Zippel argument over F_p^5, not externally reviewed.)
 - **Account ↔ key binding and scheme convergence.** The proof binds to signer public keys, and the
   validity lane now proves **SDK-signed** leanXMSS batches (K11), not deterministic test keys. Still
   open: tying a key to a specific account (a registry or ERC-4337 account check) and converging on our
