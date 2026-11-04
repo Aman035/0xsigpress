@@ -1,0 +1,39 @@
+[package]
+name = "sigpress-leanxmss"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "K11 research: leanXMSS (KoalaBear/Poseidon1, leanVM recursive-verifier fb0909d) signer CLI for the Sigpress SDK"
+
+# Standalone: not a member of the vendored leanVM workspace. The vendored crates (Apache-2.0) are used by
+# path, unmodified beyond the K10 patch (experiments/k10-terminal/patches/), which adds
+# rec_aggregation::prepare_raw_single_message_execution.
+[workspace]
+
+[[bin]]
+name = "sigpress-leanxmss"
+path = "src/main.rs"
+
+[[bin]]
+name = "sigpress-leanxmss-terminal"
+path = "src/bin/sigpress-leanxmss-terminal.rs"
+
+[dependencies]
+xmss = { path = "../../k10-terminal/vendor/leanVM/crates/xmss" }
+rec_aggregation = { path = "../../k10-terminal/vendor/leanVM/crates/rec_aggregation" }
+lean_prover = { path = "../../k10-terminal/vendor/leanVM/crates/lean_prover" }
+lean_vm = { path = "../../k10-terminal/vendor/leanVM/crates/lean_vm" }
+backend = { path = "../../k10-terminal/vendor/leanVM/crates/backend" }
+system-info = { path = "../../k10-terminal/vendor/leanVM/crates/backend/system-info" }
+clap = { version = "4.5.59", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+postcard = { version = "1.1.3", features = ["alloc"] }
+ssz = { package = "ethereum_ssz", version = "0.10" }
+sha2 = "0.10.9"
+libc = "0.2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
