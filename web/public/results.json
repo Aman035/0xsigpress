@@ -1,0 +1,51 @@
+{
+  "naive": {
+    "txHash": "0x26f4bcbf31d0b508bc97d169b4951972d3246e8605c97da177133875180604b0",
+    "gasUsed": 118606,
+    "calldataBytes": 2276
+  },
+  "batch": {
+    "txHash": "0x724ec6e8b54d4a8ec255276173d2b2daaf278b43d09303fee215ea663715c3ea",
+    "gasUsed": 102063,
+    "count": 256,
+    "root": "0x40b4e4729e176f4a538b29707f8cb66e6e1835650d24776068457eac16e9d218",
+    "bytesPerOp": 0.890625
+  },
+  "tamper": {
+    "submitTx": "0x1761b395b10477de521f0c936dd9878f92227ca126612e6dd352385e14fe27e2",
+    "challengeTx": "0xfafe5108cb194d701f439fccac90bb5b0758e2727c7e5187401fc576f7f90399",
+    "slashed": true
+  },
+  "execute": {
+    "batchId": 2,
+    "submitTx": "0x841abb79cdfea8b77bebee78e2e6edaacdc2ee6bae2d5b89dbdf90cb9373e619",
+    "finalizeTx": "0x39ae3d50a99795c8d39670b37e00e0aa18262099433680b1cadedfdbddb71e3a",
+    "executeTxs": [
+      {
+        "account": "0x3d0f54BFD21Fbbf8CCd2D48E57310d15915d5Eaa",
+        "txHash": "0xc3a6411d33ed43ea9c013a7ee387cef064ef7d3ca3e26f1ce7b88604e98c9353",
+        "gasUsed": 158267
+      },
+      {
+        "account": "0xDe48Aad1590A903e358D8aE08fA29813380c5B5f",
+        "txHash": "0xcc3153c0fc03f38a2301b7125f43db3cbafb66735d9ca095c97f1843238ca031",
+        "gasUsed": 126760
+      },
+      {
+        "account": "0xaBE00be3EB0b604a19424025a42E81c6C4fE0fb8",
+        "txHash": "0xd67f2b33f6e7db6c4acfdc1727b596cb32479f7ec521e8f61199207328e533f2",
+        "gasUsed": 126760
+      },
+      {
+        "account": "0xF4cfd46a47B0124F3Cd0F2818476D8e730aa4Db5",
+        "txHash": "0x5ea3a7550c9d7911d6de8bf027098ff6faff73b9b9626dcf95412bcad23dc5d9",
+        "gasUsed": 126748
+      }
+    ],
+    "gasPerExecute": 134634,
+    "recipient": "0x3f1FB19d9826Cb72949FA4efa1e37503DEaAb2Fb",
+    "amountEach": "0.0001",
+    "directTx": "0x9b690e18962beaa97859fae38a063b8f17aa68d718844ef6d4b1eee3159ae2c6",
+    "directGas": 186088
+  }
+}
