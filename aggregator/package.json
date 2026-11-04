@@ -1,0 +1,23 @@
+{
+  "name": "sigpress-aggregator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "naive": "tsx scripts/naive.ts",
+    "demo": "tsx scripts/demo.ts",
+    "tamper": "tsx scripts/tamper.ts"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "tsx": "^4.23.15",
+    "viem": "^2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
