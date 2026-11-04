@@ -132,3 +132,20 @@ Repo layout:
 - [x] `PQAccount` + factory: accounts execute ops only from finalized batches (key rotates each op); `executeDirect` single-op fallback; `pnpm execute` script
 - [ ] K3: proof-system survey in `experiments/k3/`, local K4 data point (Solidity STARK/WHIR verifier gas on anvil)
 - [x] Testnet numbers into `docs/decisions.md` and `web/public/results.json` (Aman wires them into the page)
+
+## Kill-test scoreboard (4 Nov 2026, all measured — see `docs/decisions.md`)
+
+| Test | Result | Key number |
+|---|---|---|
+| K1 | PASS (weaker than first claimed) | naive ML-DSA cuts byte ceiling 85-90% at 400 B/tx; **58-76%** at measured mainnet mix (1,728 B avg tx) |
+| K2 | PASS | nobody has shipped PQ aggregation |
+| K3 | PASS (conditional) | sol-spartan-whir (KoalaBear + Keccak) verifies a hash-based recursive proof in Solidity |
+| K4 | **PASS on Monad testnet** | 1 tx, ~12.84M gas, 106,628 B proof; tampered proof reverts |
+| K5 | PASS | leanVM: 1,024 sigs → 326 B/sig, 2.29 s on base M4 |
+| K6 | FAIL direct / PASS via wrap | raw leanVM proof needs binary-field math (>100M gas est.); Keccak-only terminal wrap works (K4) |
+| K8 | PASS | `handleAggregatedOps` on EntryPoint v0.8, 4 PQ ops in one tx |
+| K9 | FAIL (not fatal) | ~990 B/op via 4337 (UserOp encoding 672 B); <1 B/op via our own entry path |
+
+**Go/no-go:** validity-proof version is **go on gas and size**. The critical path is now the terminal
+prover (wrap leanVM's proof of our batch into the Keccak terminal format) and binding its public input
+to our batch root. The optimistic version is live today on testnet.
