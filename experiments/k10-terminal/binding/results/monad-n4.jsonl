@@ -1,0 +1,17 @@
+{"step":"deploy_verifier","r":{"contractAddress":"0x79ef057bf1a0aa01a5c8935804f955d68fe3c7e4","status":"0x1","gasUsed":"0xd97517","transactionHash":"0x97d287a1edf07018095f4abd546c4de346c601e18ead35dc5be26ea2e4daf7a0","estimate":"13572655"}}
+{"step":"deploy_gate","r":{"contractAddress":"0xd4ce9f047db1a26e9a667ce052edde0c6d5aa299","status":"0x1","gasUsed":"0x1f97e7","transactionHash":"0xe4ae9ea016d6ef7a18d992dc2064664df16e8f541a7db0a8d2a5524921f9ecf8","estimate":"1971908"}}
+{"step":"eth_call_swap-batches","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-message","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-signer","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_wrong-slot","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"eth_call_tampered_proof","result":"Error: server returned an error response: error code 3: execution reverted: MERKLE_ROOT"}
+{"step":"submit_calldata_bytes","result":107524}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0xf0f2bf","transactionHash":"0x8aff146771641e090e1d0505e7aafe36f531ec9e4bac7b9866ce78b9880d581f","estimate":"15038841"}}
+{"step":"eth_call_replay","result":"Error: server returned an error response: error code 3: execution reverted"}
+{"step":"accepted","result":"true","commitment":"0xcf2b36d9e7cb80001ce882e50f4595b3e319f35e2b6b33e40811f8a9eb4f2771","verifier":"0x79ef057bf1a0aa01a5c8935804f955d68fe3c7e4","hasher":"0xb42CFc7fC5cdA85242dd3423F55DEc8b25Ce8dB2","gate":"0xd4ce9f047db1a26e9a667ce052edde0c6d5aa299"}
+{"step":"eth_call_swap-batches_revert_data","data":"0x5ade0455"}
+{"step":"eth_call_wrong-message_revert_data","data":"0x5ade0455"}
+{"step":"eth_call_wrong-signer_revert_data","data":"0x5ade0455"}
+{"step":"eth_call_wrong-slot_revert_data","data":"0x5ade0455"}
+{"step":"eth_call_replay_revert_data","data":"0x1aa8064c"}
+{"step":"submit_sdk_signed_warm_cache","status":"0x1","gasUsed":"0xe1621f","transactionHash":"0xc0365db309776efec97112ef0fda1d6bb29bed6cacea7ceb04ca88b5bc719495","estimate":"14067352"}
