@@ -5,9 +5,10 @@
 Every number below is either **sourced** (primary-source link) or **measured on Monad testnet** (with a
 tx hash in `decisions.md`). Where something is an estimate, it says so.
 
-> **One-line framing:** optimistic aggregation is **live on Monad testnet today**; the hash-based-STARK
-> validity-proof version is **proven feasible** (verifier runs on Monad, prover hits the size/speed
-> bars) and blocked on one integration — joining the two. See §3 (efforts) and §4 (unknowns).
+> **One-line framing:** optimistic aggregation is **live on Monad testnet today**, and the hash-based-STARK
+> validity proof **now runs end to end on our own signatures**: leanXMSS batches → leanVM → Keccak
+> terminal proof → **verified on Monad in one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). Remaining: trustless
+> batch binding and per-op messages. See §3 (efforts) and §4 (unknowns).
 
 ---
 
@@ -127,6 +128,10 @@ Three reasons, each now backed by a measurement, not a claim:
 - **Verifier (K4):** a hash-based STARK verifier (sol-spartan-whir, KoalaBear + Keccak, no pairings,
   no Poseidon in the EVM) deployed on Monad testnet and **verified a proof in one tx at ~12.84M gas**;
   a 1-bit-tampered proof reverts (`MERKLE_ROOT`).
+- **End to end on our signatures (K10):** 2 × 4 leanXMSS signatures → leanVM → lift → Keccak terminal
+  proof (≈110 KB) → our generated verifier + gate on Monad: **one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)).
+  On anvil 2 × 256 costs the same (~12.1M gas, 106,628 B calldata) → **~24k gas, ~208 B per signature**,
+  flat in N. Proving 40-58 s, ~6 GB RSS on a 16 GB M4. Not yet bound: trustless batch link, per-op messages.
 - **Prover (K5):** leanVM aggregates **1,024 leanXMSS signatures → 326 B/sig** in **2.29 s** (verify
   9.5 ms); 4×1,024 recursion reaches **~61 B/sig**. Comfortably under the 400 B/sig and 3 s bars.
 
@@ -186,8 +191,8 @@ Full detail in `docs/demo.md`.
 3. **(0:50–1:10) Comparison.** Two gauges (labelled *capacity model*): naive PQ fills the block; Sigpress
    returns it to the tx-count ceiling. Scoreboard: a whole PQ op goes from 2,276 B → **98 B** on chain (23x).
 4. **(1:10–1:30) Kill shot.** Tamper one signature → `challenge` tx: **bond slashed, batch rejected on
-   chain.** "On chain, not on trust. Optimistic today; the STARK validity proof — verifier already runs
-   on Monad at 12.8M gas — is the product."
+   chain.** "On chain, not on trust. Optimistic today; and the STARK validity proof already verifies our
+   own signature batches on Monad in one transaction — that is the product."
 
 ## One-liners for Q&A
 

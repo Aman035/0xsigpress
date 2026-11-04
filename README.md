@@ -55,8 +55,10 @@ operation costs **98 bytes** on chain instead of 2,276 (**23× smaller**, measur
 
 ## What we built — live & measured on Monad testnet
 
-> **Optimistic aggregation is live today. The STARK validity-proof version is proven feasible** (verifier
-> runs on Monad, prover hits the size/speed bars) and blocked only on joining the two. Every number below
+> **Optimistic aggregation is live today, and the STARK validity-proof chain now runs end to end:** our own
+> leanXMSS signature batches → leanVM → Keccak terminal proof → verified on Monad in **one tx (~12.2M gas)**
+> ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)). On-chain cost is flat in N (~208 B and ~24k gas per signature at 2 × 256, anvil). Binding
+> to per-op messages and a trustless batch link are still in progress. Every number below
 > has a tx hash in [`decisions.md`](docs/decisions.md).
 
 | | Measured on Monad testnet |
@@ -68,6 +70,7 @@ operation costs **98 bytes** on chain instead of 2,276 (**23× smaller**, measur
 | 👤 PQ 4337 account executes from a finalized batch | ~134,634 gas |
 | 🔗 Standard `handleAggregatedOps` (EntryPoint v0.8) | 4-op aggregated bundle executes (828,003 gas) |
 | 🧮 **STARK verifier (hash-based, no pairings)** | deployed on Monad, **verifies a proof in one tx (~12.84M gas)**; tampered proof reverts |
+| 🧮 **Our own signatures through the STARK chain** | 2 × 4 leanXMSS sigs → terminal proof → **verified on Monad, one tx, ~12.2M gas** ([tx](https://testnet.monadexplorer.com/tx/0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92)); tampered proof and swapped roots revert |
 | ⚙️ Prover | **1,024 signatures → 326 bytes/sig in 2.29 s** (→ ~61 B/sig with recursion) |
 
 ---
@@ -122,10 +125,10 @@ already on Monad. ([Why hash-based = quantum-proof, in `pitch.md`.](docs/pitch.m
 
 ## Honest limits
 
-- **Optimistic today, not yet a validity proof.** Today's on-chain object is a Merkle root + bond with a
-  challenge window. The one-STARK-over-N-signatures version is proven feasible and is the next milestone —
-  the terminal prover is now found and Apache-2.0 licensed; wiring our proof chain is ~1–2 weeks (see
-  [`docs/pitch.md`](docs/pitch.md) §5).
+- **Validity proof is early.** The STARK chain verifies our own signature batches on Monad, but today:
+  the batch-root ↔ proof link is set by one trusted address, all signers in a batch sign one message,
+  it uses the older Poseidon leanXMSS (not our Keccak WOTS), and proving takes ~40-60 s on a laptop.
+  The live product path is still the optimistic one (root + bond + challenge window).
 - **Stateful keys.** Hash-based one-time keys must never be reused; the account rotates per op.
 - **Every number** here is measured on testnet (tx hash in [`decisions.md`](docs/decisions.md)) or
   labelled a capacity model.
