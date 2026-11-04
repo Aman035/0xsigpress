@@ -1,0 +1,1 @@
+error: use two distinct application statements for the binary experiment

@@ -1,0 +1,38 @@
+{
+  "application_root": [
+    840934446,
+    2129747154,
+    1821304217,
+    357536743,
+    1408293512,
+    200678284,
+    1383643660,
+    1052987949
+  ],
+  "child_proving_ms": 624.809125,
+  "lifted_proof_bytes": 266961,
+  "lifted_proof_shape": {
+    "log_inv_rate": 2,
+    "log_memory": 19,
+    "table_log_heights": {
+      "execution": 17,
+      "extension_op": 17,
+      "poseidon16": 14
+    }
+  },
+  "lifted_proving_ms": 743.787084,
+  "native_verification": "passed",
+  "node_proof_bytes": 275562,
+  "node_proof_shape": {
+    "log_inv_rate": 2,
+    "log_memory": 20,
+    "table_log_heights": {
+      "execution": 18,
+      "extension_op": 18,
+      "poseidon16": 15
+    }
+  },
+  "node_proving_ms": 1512.425625,
+  "profile": "control-binary-node-smoke-v1",
+  "public_claim_mutations": "lifted application digest and binary application root rejected"
+}
