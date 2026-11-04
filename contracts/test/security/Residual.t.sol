@@ -18,26 +18,28 @@ contract Gate {
     }
 }
 
-/// @notice Residual risks that are NOT fixed (design-level). These tests pass: they pin down today's behaviour
-///         so a future fix shows up as a deliberate test change. See docs/security-review.md.
+/// @notice The former residual risks SR-R1..R3 (design-level), each now flipped to assert the fixed behaviour.
+///         See docs/security-review.md and RevealGame.t.sol / FailedOp.t.sol for the detailed tests.
 contract ResidualTest is Test {
     OptimisticAggregator agg;
     uint256 constant BOND = 0.01 ether;
     uint256 constant WINDOW = 120;
+    uint256 constant DEPOSIT = 0.001 ether;
+    uint256 constant REVEAL_WINDOW = 30;
     address aggregator = address(0xA66);
     address thief = address(0x7E1F);
     bytes32 seed = keccak256("residual");
 
     function setUp() public {
-        agg = new OptimisticAggregator(BOND, WINDOW);
+        agg = new OptimisticAggregator(BOND, WINDOW, DEPOSIT, REVEAL_WINDOW);
         vm.deal(aggregator, 1 ether);
     }
 
-    /// SR-R1 (data availability): the chain only sees keccak256(sig). An aggregator that commits a leaf for an op
-    /// nobody signed, with a sigHash that has no known preimage, and withholds the data, cannot be challenged:
-    /// after the window the forged op runs. Safety of the optimistic path rests on someone holding every
-    /// signature of every batch (the DA document) during the window.
-    function test_residual_withheldDataForgesOp() public {
+    /// SR-R1 (fixed): an aggregator commits a leaf for an op nobody signed, with a sigHash that has no known
+    /// preimage, and withholds the data. A watcher demands the signature with requestReveal; it cannot be
+    /// produced, so finalize is blocked, the batch is slashed once the reveal deadline passes, and the forged op
+    /// never runs.
+    function test_fixed_withheldDataIsSlashed() public {
         bytes32 pk = WOTSHelper.pkHash(seed, 0);
         PQAccount acct = new PQAccount(agg, pk);
         vm.deal(address(acct), 1 ether);
@@ -47,10 +49,18 @@ contract ResidualTest is Test {
         bytes32 leaf = keccak256(abi.encodePacked(pk, m, fakeSigHash));
         vm.prank(aggregator);
         uint256 id = agg.submitBatch{value: BOND}(leaf, 1, "withheld");
+        address watcher = address(0x3A7C);
+        vm.deal(watcher, 1 ether);
+        vm.prank(watcher);
+        agg.requestReveal{value: DEPOSIT}(id, 0);
         vm.warp(block.timestamp + WINDOW);
+        vm.expectRevert(OptimisticAggregator.RevealPending.selector);
         agg.finalize(id);
+        agg.slashUnrevealed(id, 0);
+        assertEq(watcher.balance, 1 ether + BOND / 2);
+        vm.expectRevert(PQAccount.NotAccepted.selector);
         acct.executeFromBatch(id, next, thief, 1 ether, "", 0, new bytes32[](0), fakeSigHash);
-        assertEq(thief.balance, 1 ether);
+        assertEq(thief.balance, 0);
     }
 
     /// SR-R2 (fixed): a slash pays half the bond to the challenger and burns the rest, so an aggregator that

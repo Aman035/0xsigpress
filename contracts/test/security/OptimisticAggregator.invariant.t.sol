@@ -26,8 +26,9 @@ contract AggregatorHandler is Test {
     mapping(uint256 => bool) public everFinalized;
     uint256 public slashes;
     uint256 public finals;
+    uint256 public requests;
     bool public flagFlipped; // a slashed/finalized flag was ever cleared
-    bool public goodSlashed; // a batch with only valid signatures was slashed
+    bool public goodSlashed; // a batch with only valid signatures was slashed by challenge or reveal
     bool public badFinalizedAfterChallenge; // a successful challenge did not stop finalize
 
     constructor(OptimisticAggregator agg_) {
@@ -81,6 +82,42 @@ contract AggregatorHandler is Test {
         _sync(id);
     }
 
+    /// A watcher demands leaf 0 of a batch (single-leaf batches).
+    function requestReveal(uint256 seed) external {
+        if (leaves.length == 0) return;
+        uint256 id = seed & 1 == 0 ? leaves.length - 1 : seed % leaves.length;
+        try agg.requestReveal{value: agg.revealDeposit()}(id, 0) {
+            requests++;
+        } catch {}
+    }
+
+    /// The aggregator answers (it always has the data, except for withheld batches).
+    function reveal(uint256 seed) external {
+        if (leaves.length == 0) return;
+        uint256 id = seed % leaves.length;
+        Leaf memory l = leaves[id];
+        bool wasSlashed = everSlashed[id];
+        try agg.reveal(id, 0, l.pk, l.m, l.sig, new bytes32[](0)) {
+            (,,,, bool s,) = agg.batches(id);
+            if (s && !wasSlashed && l.pk == goodPk) goodSlashed = true;
+        } catch {}
+        _sync(id);
+    }
+
+    function slashUnrevealed(uint256 seed) external {
+        if (leaves.length == 0) return;
+        uint256 id = seed % leaves.length;
+        try agg.slashUnrevealed(id, 0) {
+            slashes++;
+        } catch {}
+        _sync(id);
+    }
+
+    function reclaim(uint256 seed) external {
+        if (leaves.length == 0) return;
+        try agg.reclaimDeposit(seed % leaves.length, 0) {} catch {}
+    }
+
     function warp(uint256 dt) external {
         vm.warp(block.timestamp + bound(dt, 0, 2 * agg.window()));
     }
@@ -98,7 +135,7 @@ contract OptimisticAggregatorInvariantTest is Test {
     AggregatorHandler h;
 
     function setUp() public {
-        agg = new OptimisticAggregator(0.01 ether, 120);
+        agg = new OptimisticAggregator(0.01 ether, 120, 0.001 ether, 30);
         h = new AggregatorHandler(agg);
         targetContract(address(h));
     }
@@ -107,16 +144,28 @@ contract OptimisticAggregatorInvariantTest is Test {
     function afterInvariant() public {
         emit log_named_uint("slashes", h.slashes());
         emit log_named_uint("finals", h.finals());
+        emit log_named_uint("reveal requests", h.requests());
     }
 
-    /// Bond conservation: the contract holds exactly one bond per batch that is neither slashed nor finalized.
+    /// Bond conservation: the contract holds exactly one bond per batch that is neither slashed nor finalized,
+    /// one deposit per open reveal request, and any credited (deferred) payouts.
     function invariant_bondConservation() public view {
         uint256 active;
+        uint256 open;
         for (uint256 id = 0; id < h.count(); id++) {
             (,,,, bool slashed, bool finalized) = agg.batches(id);
             if (!slashed && !finalized) active++;
+            open += agg.openReveals(id);
         }
-        assertEq(address(agg).balance, active * agg.bond());
+        assertEq(address(agg).balance, active * agg.bond() + open * agg.revealDeposit() + agg.totalCredits());
+    }
+
+    /// A batch with an open reveal request is never finalized.
+    function invariant_noFinalizeWithOpenReveal() public view {
+        for (uint256 id = 0; id < h.count(); id++) {
+            (,,,,, bool finalized) = agg.batches(id);
+            if (finalized) assertEq(agg.openReveals(id), 0);
+        }
     }
 
     /// SR-R2: every slash burns bond - bond/2 (the challenger gets bond/2), so slashing never refunds a bond.
