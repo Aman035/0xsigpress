@@ -89,11 +89,11 @@ Repo layout:
 ## Checklist: Sumith (core)
 
 - [x] Plan doc committed and pushed
-- [ ] `contracts/` Foundry project, `WOTS.sol` per spec
+- [x] `contracts/` Foundry project, `WOTS.sol` per spec
 - [x] `NaiveLane.sol` + tests (valid sig passes, flipped bit reverts)
 - [x] `OptimisticAggregator.sol` + tests (submit, challenge bad sig → slash, challenge good sig → revert, finalize after window)
 - [x] Gas report: naive verify gas, `submitBatch` gas
-- [ ] `aggregator/` TS: `wots.ts`, `merkle.ts` per spec, unit tests
+- [x] `aggregator/` TS: `wots.ts`, `merkle.ts` per spec, unit tests
 - [x] Cross-check: TS-made signature verifies in the Solidity contract (anvil)
 - [x] Deploy script; deploy both contracts to Monad testnet (chain 10143); write `deployments.json`
 - [x] `naive.ts`: one naive tx on testnet → gas + bytes
