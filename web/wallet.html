@@ -75,7 +75,8 @@
   </div>
 
   <p style="max-width:74ch;color:var(--dim);font-size:16px;margin:20px 0 0">
-    A <b style="color:var(--ink)">post-quantum wallet</b> on Monad. You hold a quantum-safe key; when you
+    A <b style="color:var(--ink)">post-quantum wallet</b> on Monad. You hold a quantum-safe key (WOTS, a
+    hash-based one-time signature); when you
     send, your signature is <b style="color:var(--ink)">aggregated with others into one proof</b> and
     settled on Monad for about <b style="color:var(--ink)">98 bytes</b> — instead of the 2,276 bytes a raw
     post-quantum signature would cost. Every step below is real and links to the Monad testnet explorer.
@@ -138,7 +139,7 @@ function phases(op){
     ? ["security window", `<b style="color:var(--purple)">${left}s left</b> — anyone can fetch the signatures and challenge a bad one`]
     : ["security window", reached>3 ? "passed with no valid challenge" : "—"];
   const P = [
-    { t:"1 · Signed in your wallet", n:"Your post-quantum one-time key signs the transfer locally. It rotates to a fresh key after this single use, so it can never sign twice.",
+    { t:"1 · Signed in your wallet", n:"Your WOTS key (Winternitz one-time, hash-based) signs the transfer locally. It rotates to a fresh key after this single use, so it can never sign twice.",
       rows:[["key index", s.nonce],["one-time key", short(s.pkHash)],["message signed", short(s.message)],
             ["signature", `${short(s.sig)} <span style="color:var(--dim)">(${s.sigBytes.toLocaleString()} bytes)</span>`],
             ["rotates to", short(s.nextPkHash)]] },

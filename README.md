@@ -117,12 +117,13 @@ cd aggregator && pnpm install && pnpm test    # TS tests
 
 ## How it works
 
-Users keep signing every operation with a post-quantum key. The aggregator batches those operations and
+Users keep signing every operation with a hash-based one-time post-quantum key (**WOTS**, Winternitz
+one-time signatures over Keccak-256). The aggregator batches those operations and
 gives Monad **one thing to check** instead of thousands of signatures, on either of two paths:
 
 ```mermaid
 flowchart LR
-  U["User wallet<br/>signs each op with a<br/>post-quantum key"] --> AGG["Aggregator<br/>collects a batch of<br/>signed operations"]
+  U["User wallet<br/>signs each op with a one-time<br/>post-quantum key (WOTS, hash-based)"] --> AGG["Aggregator<br/>collects a batch of<br/>signed operations"]
   AGG -->|"optimistic path:<br/>32-byte root + bond"| OPT["Monad: OptimisticAggregator<br/>anyone can challenge a bad<br/>signature and slash the bond"]
   AGG -->|"validity path:<br/>one hash-based STARK"| STK["Monad: STARK verifier<br/>checks all N signatures<br/>in a single transaction"]
   OPT --> EXE["PQ account executes<br/>from a finalized batch"]
