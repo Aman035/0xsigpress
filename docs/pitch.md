@@ -122,6 +122,8 @@ Three reasons, each now backed by a measurement, not a claim:
   per op — **~134,634 gas/execute**.
 - **Standard 4337 holds (K8):** a 4-op aggregated bundle runs through `handleAggregatedOps` on the real
   v0.8 EntryPoint on Monad testnet (**828,003 gas**), via a custom `IAggregator`.
+- **Compact bundle (K9 fix):** a `SigpressEntry` that recomputes the root on chain brings per-op cost to
+  **98 bytes/op at N=128** on testnet — 0.25–0.32× a normal Monad tx.
 
 **Validity-proof path — proven feasible:**
 - **Verifier (K4):** a hash-based STARK verifier (sol-spartan-whir, KoalaBear + Keccak, no pairings,
@@ -147,9 +149,10 @@ works structurally — but:
 - **Binding + scheme alignment:** the terminal's public input must be bound to our batch root; the
   Solidity terminal targets KoalaBear-era leanVM while leanVM main is binary-field; and our on-chain
   scheme is WOTS, not leanXMSS. These must be reconciled.
-- **K9 (bytes/op) fails its 1.5× target, non-fatally:** the 4337 path is 990 B/op — 2.3× *smaller* than
-  naive PQ but 2.5× *bigger* than a normal Monad tx, because of ABI padding and Merkle proofs, not the
-  signature. Fix: a compact bundle format (~2 weeks).
+- **K9 (bytes/op): the generic 4337 path missed the 1.5× target (990 B/op) — now fixed.** The compact
+  `SigpressEntry` bundle (root recomputed on chain, no per-op proofs) measures **98 B/op at N=128 on
+  Monad testnet — 0.25–0.32× a normal tx**, well under target. The plain `handleAggregatedOps` path
+  stays 990 B/op because of UserOp ABI padding.
 - **Latency:** proving ~2.3 s > a 300 ms block, so batches span blocks; single-op verification is always
   available as a fallback.
 - **Licences (checked):** leanMultisig/Plonky3/Stwo are MIT/Apache; but sol-whir pulls in GPL-3.0
