@@ -10,9 +10,38 @@ One hash-based proof replaces a whole batch of post-quantum signatures, so Monad
 [![Monad testnet](https://img.shields.io/badge/Monad-testnet%20(10143)-836EF9)](https://testnet.monadexplorer.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built at](https://img.shields.io/badge/built%20at-Monad%20Blitz-111)](https://blitz.devnads.com)
-[![Demo](https://img.shields.io/badge/demo-live-836EF9)](https://aman035.github.io/sigpress/)
+[![Demo](https://img.shields.io/badge/demo-live-836EF9)](https://sumithprabhu.github.io/sigpress/)
 
 </div>
+
+---
+
+## Submission details
+
+| | |
+|---|---|
+| **Project name** | Sigpress |
+| **One-line description** | Post-quantum signature aggregation for Monad: thousands of hash-based signatures verified in one STARK transaction, so quantum-safe accounts don't eat block space. |
+| **Live URL** | https://sumithprabhu.github.io/sigpress/ |
+| **Deployment network** | Monad testnet (chain ID `10143`, RPC `https://testnet-rpc.monad.xyz`) |
+| **Main contract** | `SigpressValidityGate` (STARK, 2,048 signers per tx) at [`0x5648caea56baa011b6685ce091089b561621a661`](https://testnet.monadvision.com/address/0x5648caea56baa011b6685ce091089b561621a661) |
+| **Other contracts** | `OptimisticAggregator` [`0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978`](https://testnet.monadvision.com/address/0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978), `SigpressEntry` [`0x041734ddcC0320f546F924AD1D3CDC5a023D04e0`](https://testnet.monadvision.com/address/0x041734ddcC0320f546F924AD1D3CDC5a023D04e0); full list in [Contracts](#contracts) |
+
+### Setup
+
+Requirements: [Foundry](https://getfoundry.sh), Node 22+ and pnpm. Rust nightly only for the STARK prover.
+
+```sh
+git clone https://github.com/sumithprabhu/sigpress && cd sigpress
+cd contracts && forge test && cd ..                 # Solidity tests
+cd aggregator && pnpm install && pnpm test && cd .. # TS aggregator + SDK tests
+echo "PRIVATE_KEY=0x<funded Monad testnet key>" > .env
+cd aggregator && STEP=1 pnpm stage                  # live demo on Monad testnet (beats 1-4)
+VALIDITY=1 pnpm stage                               # + beat 5: STARK validity proof
+cd ../web && python3 -m http.server 8080            # demo page at http://localhost:8080
+```
+
+Testnet MON: https://faucet.monad.xyz
 
 ---
 
@@ -79,7 +108,7 @@ operation costs **98 bytes** on chain instead of 2,276 (**23x smaller**, measure
 
 ## Try it
 
-**Live demo page: https://aman035.github.io/sigpress/**
+**Live demo page: https://sumithprabhu.github.io/sigpress/**
 
 ```sh
 # Demo page locally (two capacity lanes + scoreboard + live explorer links)
@@ -164,13 +193,16 @@ flowchart LR
 
 ## Contracts
 
-**Deployed by us** (chain 10143, source-verified on MonadVision / Sourcify):
+**Deployed by us** (Monad testnet, chain 10143; the first six are source-verified on MonadVision / Sourcify):
 
-- **NaiveLane** `0xcFc286564ed4281E200c6D052f9E1A932b31E845`
-- **OptimisticAggregator** `0xEAA3AC4807767F8fe5B8caD979cB523A926b2A1E`
-- **PQAccountFactory** `0x7335b48f2d794d4a196618916Ec196a1a1615442`
-- **SigpressAggregator4337** `0xe6869caa26a2581880a8d237c1a1f9a26c6c212e`
-- **PQAccount4337Factory** `0x21d2ee544075fb5da08bc44bd9a68f6d736e6563`
+- **NaiveLane** `0xdc851806c0aff142F01aab5d1e278AE59FF49508`
+- **OptimisticAggregator** `0x9ba4BeCfe900f60C440Fdb04626661E8f78aE978`
+- **PQAccountFactory** `0x6B8A6a5Ac45808C89e6eF372a3822166aF501B5D`
+- **SigpressEntry** `0x041734ddcC0320f546F924AD1D3CDC5a023D04e0`
+- **SigpressAggregator4337** `0x92453F8fAF396840ADcCE4E7fc22a1d7Ef5D0bE6`
+- **PQAccount4337Factory** `0x5114eB07DF21D1e567e6281A489EBAb14E5880c6`
+- **SigpressValidityGate, 2 x 1024** `0x5648caea56baa011b6685ce091089b561621a661` (verifier `0xc6304db43e642c0bc43b55f13a3ebe21f336794f`)
+- **SigpressValidityGate, 2 x 256** `0x38eeb174d437c038dd16ca91e682f24cdc71c697` (verifier `0xa43f61c3936dc4d22b471594f99a33eadc7c4abb`)
 
 **Pre-existing infrastructure we build on (not ours):** the canonical ERC-4337 EntryPoint v0.8
 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`, the standard cross-chain deployment, already live on
