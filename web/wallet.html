@@ -74,9 +74,16 @@
     <div class="chip"><span class="dot" id="svcDot"></span><span id="svcTag">connecting to the aggregator…</span></div>
   </div>
 
+  <p style="max-width:74ch;color:var(--dim);font-size:16px;margin:20px 0 0">
+    A <b style="color:var(--ink)">post-quantum wallet</b> on Monad. You hold a quantum-safe key; when you
+    send, your signature is <b style="color:var(--ink)">aggregated with others into one proof</b> and
+    settled on Monad for about <b style="color:var(--ink)">98 bytes</b> — instead of the 2,276 bytes a raw
+    post-quantum signature would cost. Every step below is real and links to the Monad testnet explorer.
+  </p>
+
   <div class="cols">
     <div>
-      <h2>Your post-quantum accounts</h2>
+      <h2>Your wallet</h2>
       <div id="accts"></div>
       <div class="composer">
         <label for="amt">Amount (MON)</label>
@@ -125,28 +132,33 @@ function phases(op){
   const at = n => ({pending:0,queued:1,batched:2,finalized:3,executed:4,failed:9})[n] ?? 0;
   const st = v?.status || "queued";
   const reached = st==="failed" ? 1 : at(st);
+  const now = Math.floor(Date.now()/1000);
+  const left = b.deadline ? Math.max(0, Number(b.deadline) - now) : null;
+  const windowRow = (st==="batched" && left!=null)
+    ? ["security window", `<b style="color:var(--purple)">${left}s left</b> — anyone can fetch the signatures and challenge a bad one`]
+    : ["security window", reached>3 ? "passed with no valid challenge" : "—"];
   const P = [
-    { k:"sign", t:"Signed in your wallet", n:"A post-quantum one-time key signs this transfer. The key rotates after one use — it can never sign twice.",
-      rows:[["key index (nonce)", s.nonce],["one-time public key", short(s.pkHash)],["signed message", short(s.message)],
+    { t:"1 · Signed in your wallet", n:"Your post-quantum one-time key signs the transfer locally. It rotates to a fresh key after this single use, so it can never sign twice.",
+      rows:[["key index", s.nonce],["one-time key", short(s.pkHash)],["message signed", short(s.message)],
             ["signature", `${short(s.sig)} <span style="color:var(--dim)">(${s.sigBytes.toLocaleString()} bytes)</span>`],
-            ["rotates to", short(s.nextPkHash)],["batch leaf", short(s.leaf)]] },
-    { k:"queued", t:"Aggregator checked and queued it", n:"The aggregator verified the signature off chain and added the op to its queue. It never sees your key.",
-      rows:[["op id", short(op.id)],["status", st]] },
-    { k:"batched", t:"Folded into one batch on Monad", n:"Your op plus others become a single 32-byte Merkle root, posted on chain with a bond. The signatures stay off chain.",
-      rows:[["batch", b.id!=null?`#${b.id}`:"—"],["ops in batch", b.count ?? "—"],["batch root", short(b.root)],["submitBatch", tx(b.submitTx)]] },
-    { k:"finalized", t:"Challenge window passed", n:"Anyone could fetch the batch's signatures and challenge a bad one during the window. None was. The batch is finalized.",
-      rows:[["finalize", tx(b.finalizeTx)]] },
-    { k:"executed", t:"Executed on Monad", n:"The whole batch ran in one transaction; your transfer went through for about 98 bytes on chain.",
-      rows:[["executeBundle", tx(b.executeTx || v?.txHash)],["call succeeded", v?.callSuccess===false?'<span class="slash">no</span>':"yes"]] },
+            ["rotates to", short(s.nextPkHash)]] },
+    { t:"2 · Sent to the aggregator", n:"The aggregator re-checks the signature off chain and queues the op. It never holds your key and can't alter the transfer.",
+      rows:[["off-chain check", "signature valid"],["op id", short(op.id)]] },
+    { t:"3 · Batched on Monad", n:"Your op (plus any others) becomes one 32-byte Merkle root, posted on chain with a bond. The 2,144-byte signatures stay off chain — that is the whole point.",
+      rows:[["batch", b.id!=null?`#${b.id}`:"—"],["ops in batch", b.count ?? "—"],["batch root", short(b.root)],["submitBatch on Monad", tx(b.submitTx)]] },
+    { t:"4 · Challenge window", n:"A short window where anyone can prove a signature is bad and slash the batch. This is the optimistic security tradeoff.",
+      rows:[windowRow,["finalized on Monad", tx(b.finalizeTx)]] },
+    { t:"5 · Executed on Monad", n:"The whole batch runs in one transaction and the transfer lands. On-chain cost is about 98 bytes per operation, versus 2,276 bytes to put the signature on chain raw.",
+      rows:[["executeBundle on Monad", tx(b.executeTx || v?.txHash)],["transfer", v?.callSuccess===false?'<span class="slash">call failed</span>':`sent to ${addr(op.to)}`]] },
   ];
-  const badge = st==="executed" ? '<span class="s exec">executed</span>' : st==="failed" ? '<span class="s fail">failed</span>' : `<span class="s">${st}</span>`;
+  const badge = st==="executed" ? '<span class="s exec">done</span>' : st==="failed" ? '<span class="s fail">rejected</span>' : `<span class="s">working… (${st})</span>`;
   const body = P.map((ph,i)=>{
     const cls = reached>i ? "done" : reached===i ? "on" : "";
     const show = reached>=i;
     const rows = show ? `<dl class="kv">${ph.rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]??"—"}</dd>`).join("")}</dl>` : "";
     return `<div class="phase ${cls}"><div class="pico"></div><div><div class="pt">${ph.t}</div><div class="pn">${ph.n}</div>${rows}</div></div>`;
   }).join("");
-  const err = st==="failed" ? `<div class="phase fail"><div class="pico"></div><div><div class="pt">Failed</div><div class="pn mono">${v?.error||""}</div></div></div>` : "";
+  const err = st==="failed" ? `<div class="phase fail"><div class="pico"></div><div><div class="pt">Rejected</div><div class="pn mono">${v?.error||""}</div></div></div>` : "";
   return `<div class="oph"><div class="t">Transfer <small>${op.amount} MON → ${short(op.to)}</small></div>${badge}</div>${body}${err}`;
 }
 
@@ -156,12 +168,14 @@ function renderFeed(){
     `<div class="empty">Pick an account and send a transfer.</div>`;
 }
 async function poll(op){
-  for (let i=0;i<120;i++){
+  for (let i=0;i<180;i++){
     const { status, body } = await api(`/api/op/${encodeURIComponent(op.id)}`);
     if (status<400){ op.view = body; renderFeed(); if (body.status==="executed"||body.status==="failed"){ loadState(); return; } }
-    await new Promise(r=>setTimeout(r,1500));
+    await new Promise(r=>setTimeout(r,1000));
   }
 }
+// tick once a second so the challenge-window countdown stays live between polls
+setInterval(()=>{ if (OPS.some(o=>o.view?.status==="batched")) renderFeed(); }, 1000);
 
 $("sendBtn").onclick = async () => {
   const a = STATE.accounts[SEL]; const amount = $("amt").value.trim();

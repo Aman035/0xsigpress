@@ -1,0 +1,10 @@
+{
+  "chainId": 10143,
+  "batches": "0x22572E8B17C1df8D20d5254Ea7508C208fFE5dC0",
+  "entry": "0xc8e429323b03F3CDf3d7fA10E75445D52faF7079",
+  "accountImpl": "0xdE87557A98b9A405Cd57324f8cdBc726Da24daae",
+  "bond": "0.01",
+  "window": 8,
+  "explorer": "https://testnet.monadexplorer.com",
+  "note": "Fast instance for the interactive wallet demo: 8-second challenge window so a transfer finishes in ~15s. Latest contracts (dead-op records, per-op gas cap, SR-R1 reveal game, SR-R2 bond burn)."
+}

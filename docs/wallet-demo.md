@@ -22,7 +22,7 @@ From `aggregator/`, with `KEY_VAR` pointing at a funded key (`PRIVATE_KEY_K13` a
 pnpm install                                   # first time only (node_modules)
 
 # terminal 1 — the aggregator service (batches + submits to Monad)
-KEY_VAR=PRIVATE_KEY_K13 pnpm service           # http://127.0.0.1:8547
+SERVICE_DEPLOYMENTS=deployments-wallet.json KEY_VAR=PRIVATE_KEY_K13 pnpm service   # http://127.0.0.1:8547 (fast 8s window)
 
 # terminal 2 — the wallet (serves the UI, signs, relays)
 KEY_VAR=PRIVATE_KEY_K13 pnpm wallet            # http://127.0.0.1:8550  ← open this
