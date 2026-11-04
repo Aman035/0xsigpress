@@ -1,0 +1,375 @@
+diff --git a/crates/rec_aggregation/Cargo.toml b/crates/rec_aggregation/Cargo.toml
+index 8eb0b2f7..228ffb2f 100644
+--- a/crates/rec_aggregation/Cargo.toml
++++ b/crates/rec_aggregation/Cargo.toml
+@@ -21,6 +21,7 @@ backend.workspace = true
+ parallel.workspace = true
+ postcard.workspace = true
+ serde.workspace = true
++sha3 = "0.11"
+ 
+ [target.'cfg(target_os = "macos")'.dependencies]
+ objc2.workspace = true
+diff --git a/crates/rec_aggregation/src/lib.rs b/crates/rec_aggregation/src/lib.rs
+index 1153daf3..60c2d202 100644
+--- a/crates/rec_aggregation/src/lib.rs
++++ b/crates/rec_aggregation/src/lib.rs
+@@ -46,7 +46,8 @@ pub use multi_message_aggregation::{
+ };
+ pub use single_message_aggregation::{
+     SingleMessageAggregateSignature, SingleMessageCore, SingleMessageInfo, aggregate_single_message_signatures,
+-    prepare_raw_per_signer_execution, prepare_raw_single_message_execution,
++    SigpressBindV2Statement, prepare_raw_per_signer_execution, prepare_raw_single_message_execution,
++    sigpress_bind_v2_challenge, sigpress_bind_v2_eval,
+     verify_single_message_aggregate,
+ };
+ 
+diff --git a/crates/rec_aggregation/src/single_message_aggregation.rs b/crates/rec_aggregation/src/single_message_aggregation.rs
+index 6d98ec09..e4913750 100644
+--- a/crates/rec_aggregation/src/single_message_aggregation.rs
++++ b/crates/rec_aggregation/src/single_message_aggregation.rs
+@@ -653,14 +653,95 @@ pub fn prepare_raw_single_message_execution(
+     Ok((public_input, witness, global_pub_keys, pub_input_data))
+ }
+ 
+-/// sigpress (K10 binding): one leanXMSS signature per signer, each over its OWN 32-byte message, all at
+-/// one `slot`, for the patched aggregation program (raw-only, per-signer messages, in-guest tweak
+-/// table). Public-input preimage = the single-message layout with
+-///   pubkeys_hash  = poseidon_hash_slice(pk_0 | pk_1 | ...)                   (8 FE per pk)
+-///   message slot  = poseidon_hash_slice(hash_message(m_0) | hash_message(m_1) | ...)
+-///   tweaks slot   = 8 zeros (the guest derives the tweak table from the slot itself)
+-/// in signer order (sorted by public key here, for determinism; any order the caller hashes works).
+-/// Returns (public_input, witness, ordered (pk, message) entries, preimage).
++/// sigpress binding v2: the gate-side Fiat-Shamir challenge r in F_{p^5}.
++/// h = keccak256(keccak256("sigpress-bind-v2") | u256(slot) | u256(n) | D (8 x u32 BE)
++///               | pk_0 .. pk_{n-1} (8 x u32 BE each) | m_0 .. m_{n-1} (32 B each))
++/// r_k = ((h >> 48k) & (2^48 - 1)) mod p, k = 0..5 (h read as a big-endian 256-bit integer).
++pub fn sigpress_bind_v2_challenge(
++    slot: u32,
++    d_commit: &[F; DIGEST_LEN],
++    pubkeys: &[[F; PUB_KEY_FLAT_SIZE]],
++    messages: &[[u8; MESSAGE_LEN_BYTES]],
++) -> EF {
++    use sha3::{Digest, Keccak256};
++    let tag: [u8; 32] = Keccak256::digest(b"sigpress-bind-v2").into();
++    let mut buf = Vec::with_capacity(128 + 64 * pubkeys.len());
++    buf.extend_from_slice(&tag);
++    let mut w = [0u8; 32];
++    w[28..].copy_from_slice(&slot.to_be_bytes());
++    buf.extend_from_slice(&w);
++    let mut w = [0u8; 32];
++    w[24..].copy_from_slice(&(pubkeys.len() as u64).to_be_bytes());
++    buf.extend_from_slice(&w);
++    for x in d_commit {
++        buf.extend_from_slice(&x.as_canonical_u32().to_be_bytes());
++    }
++    for pk in pubkeys {
++        for x in pk {
++            buf.extend_from_slice(&x.as_canonical_u32().to_be_bytes());
++        }
++    }
++    for m in messages {
++        buf.extend_from_slice(m);
++    }
++    let h: [u8; 32] = Keccak256::digest(&buf).into();
++    // h as big-endian; limb k = bits [48k, 48k + 48) counted from the least significant end.
++    let mut le = h;
++    le.reverse();
++    let limbs: [F; 5] = std::array::from_fn(|k| {
++        let mut v: u64 = 0;
++        for b in 0..6 {
++            v |= u64::from(le[6 * k + b]) << (8 * b);
++        }
++        F::from_u64(v % u64::from(F::ORDER_U32))
++    });
++    EF::from_basis_coefficients_slice(&limbs).unwrap()
++}
++
++/// sigpress binding v2: v = Horner_{rho = r^17} over signers of s_i(r) = sum_k pk_i[k] r^k + sum_k l_i[k] r^(8+k)
++/// with l_i = xmss::encode_message(m_i) (9 base-p limbs).
++pub fn sigpress_bind_v2_eval(
++    r: EF,
++    pubkeys: &[[F; PUB_KEY_FLAT_SIZE]],
++    messages: &[[u8; MESSAGE_LEN_BYTES]],
++) -> EF {
++    let rec_len = PUB_KEY_FLAT_SIZE + xmss::MESSAGE_EMBEDDING_LEN_FE;
++    let mut pw = vec![EF::ONE; rec_len];
++    for k in 1..rec_len {
++        pw[k] = pw[k - 1] * r;
++    }
++    let rho = pw[rec_len - 1] * r;
++    let mut acc = EF::ZERO;
++    for (pk, m) in pubkeys.iter().zip(messages) {
++        let limbs = xmss::encode_message(m);
++        let mut s = EF::ZERO;
++        for k in 0..PUB_KEY_FLAT_SIZE {
++            s += pw[k] * pk[k];
++        }
++        for k in 0..limbs.len() {
++            s += pw[PUB_KEY_FLAT_SIZE + k] * limbs[k];
++        }
++        acc = acc * rho + s;
++    }
++    acc
++}
++
++/// sigpress binding v2 statement pieces of one batch (for reports / the gate).
++pub struct SigpressBindV2Statement {
++    pub d_commit: [F; DIGEST_LEN],
++    pub r: EF,
++    pub v: EF,
++}
++
++/// sigpress (K10 binding v2): one leanXMSS signature per signer, each over its OWN 32-byte message, all at
++/// one `slot`, for the patched aggregation program (raw-only, per-signer messages, in-guest tweak table,
++/// in-guest hash_message, Keccak-challenge polynomial binding). Public-input preimage = the single-message
++/// layout with
++///   pubkeys slot = D = poseidon16_compress(hash_slice(pk_0 | ...) , hash_slice(hash_message(m_0) | ...))
++///   message slot = v (5) | 0 0 0
++///   tweaks slot  = r (5) | 0 0 0
++/// in signer order (sorted by public key here, for determinism).
++/// Returns (public_input, witness, ordered (pk, message) entries, preimage, statement).
+ #[allow(clippy::type_complexity)]
+ pub fn prepare_raw_per_signer_execution(
+     mut raw: Vec<(XmssPublicKey, XmssSignature, [u8; MESSAGE_LEN_BYTES])>,
+@@ -671,6 +752,7 @@ pub fn prepare_raw_per_signer_execution(
+         ExecutionWitness,
+         Vec<(XmssPublicKey, [u8; MESSAGE_LEN_BYTES])>,
+         Vec<F>,
++        SigpressBindV2Statement,
+     ),
+     AggregationError,
+ > {
+@@ -690,15 +772,25 @@ pub fn prepare_raw_per_signer_execution(
+     }
+     let bytecode = get_aggregation_bytecode();
+     let pubkeys: Vec<XmssPublicKey> = raw.iter().map(|(pk, _, _)| pk.clone()).collect();
++    let pk_flat: Vec<[F; PUB_KEY_FLAT_SIZE]> = pubkeys.iter().map(|pk| pk.flatten()).collect();
++    let msgs: Vec<[u8; MESSAGE_LEN_BYTES]> = raw.iter().map(|(_, _, m)| *m).collect();
+     let hashed_messages: Vec<F> = raw.iter().flat_map(|(_, _, m)| hash_message(m).into_iter()).collect();
++    let limbs: Vec<F> = raw.iter().flat_map(|(_, _, m)| xmss::encode_message(m).into_iter()).collect();
+     let messages_hash = poseidon_hash_slice(&hashed_messages);
++    let d_commit = poseidon16_compress_pair(&hash_pubkeys(&pubkeys), &messages_hash);
++    let r = sigpress_bind_v2_challenge(slot, &d_commit, &pk_flat, &msgs);
++    let v = sigpress_bind_v2_eval(r, &pk_flat, &msgs);
++    let mut v_chunk = [F::ZERO; DIGEST_LEN];
++    v_chunk[..5].copy_from_slice(v.as_basis_coefficients_slice());
++    let mut r_chunk = [F::ZERO; DIGEST_LEN];
++    r_chunk[..5].copy_from_slice(r.as_basis_coefficients_slice());
+     let reduced_claims = reduce_bytecode_claims(&[]);
+     let pub_input_data = build_single_message_input_data(
+         n_sigs,
+-        &hash_pubkeys(&pubkeys),
+-        &messages_hash,
++        &d_commit,
++        &v_chunk,
+         slot,
+-        &[F::ZERO; DIGEST_LEN],
++        &r_chunk,
+         &reduced_claims.final_claim_flat(),
+         bytecode,
+     );
+@@ -710,8 +802,8 @@ pub fn prepare_raw_per_signer_execution(
+         .collect();
+     let raw_indices: ArenaVec<F> = (0..n_sigs).map(F::from_usize).collect();
+     let mut pubkeys_blob: ArenaVec<F> = ArenaVec::with_capacity(n_sigs * PUB_KEY_FLAT_SIZE);
+-    for pk in &pubkeys {
+-        pubkeys_blob.extend_from_slice(&pk.flatten());
++    for pk in &pk_flat {
++        pubkeys_blob.extend_from_slice(pk);
+     }
+     let empty: ArenaVec<ArenaVec<F>> = ArenaVec::new();
+     let mut hints = Hints::default();
+@@ -728,7 +820,7 @@ pub fn prepare_raw_per_signer_execution(
+     );
+     hints.insert(bytecode, "pubkeys", arena_vec![pubkeys_blob]);
+     hints.insert(bytecode, "raw_indices", arena_vec![raw_indices]);
+-    hints.insert(bytecode, "messages", arena_vec![ArenaVec::from_slice(&hashed_messages)]);
++    hints.insert(bytecode, "message_limbs", arena_vec![ArenaVec::from_slice(&limbs)]);
+     hints.insert(bytecode, "sub_indices", empty.clone());
+     hints.insert(bytecode, "is_split", arena_vec![arena_vec![F::ZERO]]);
+     hints.insert(bytecode, "bytecode_value_hint", empty.clone());
+@@ -747,5 +839,5 @@ pub fn prepare_raw_per_signer_execution(
+         min_table_log_n_rows: BTreeMap::new(),
+     };
+     let entries = raw.into_iter().map(|(pk, _, m)| (pk, m)).collect();
+-    Ok((public_input, witness, entries, pub_input_data))
++    Ok((public_input, witness, entries, pub_input_data, SigpressBindV2Statement { d_commit, r, v }))
+ }
+diff --git a/crates/rec_aggregation/zkdsl_implem/main.py b/crates/rec_aggregation/zkdsl_implem/main.py
+index d8f89f68..db36071d 100644
+--- a/crates/rec_aggregation/zkdsl_implem/main.py
++++ b/crates/rec_aggregation/zkdsl_implem/main.py
+@@ -5,6 +5,10 @@ MAX_RECURSIONS = MAX_RECURSIONS_PLACEHOLDER
+ MAX_N_SIGS = MAX_XMSS_AGGREGATED_PLACEHOLDER
+ MAX_N_DUPS = MAX_XMSS_DUPLICATES_PLACEHOLDER
+ 
++SIGPRESS_MSG_LIMBS = 9
++SIGPRESS_REC_LEN = 17  # PUB_KEY_SIZE (8) + SIGPRESS_MSG_LIMBS (9)
++SIGPRESS_DOMAINSEP_MESSAGE_HASH = 1004
++
+ # data_buf[0..8] = [flag, count, 0×6] (count = n_sigs for single-message, n_components for multi-message).
+ SINGLE_MESSAGE_FLAG = SINGLE_MESSAGE_FLAG_PLACEHOLDER
+ MULTI_MESSAGE_FLAG = MULTI_MESSAGE_FLAG_PLACEHOLDER
+@@ -141,14 +145,16 @@ def main():
+     # instead of being hinted and hashed, so the public-input slot for its hash is pinned to zeros and an
+     # on-chain verifier never has to hash the 1,480-element table.
+     sigpress_build_tweak_table(merkle_chunks_for_slot)
+-    set_to_8_zeros(tweaks_hash_expected)
+ 
+-    # sigpress: one hashed message (8 FE, = xmss::hash_message(msg_i)) per signer, aligned with the signer
+-    # list; the public-input message slot holds poseidon_hash_slice(messages) instead of one shared message.
++    # sigpress binding v2: each signer's 32-byte message arrives as its 9 base-p limbs (xmss
++    # encode_message); the guest hashes them itself (xmss::hash_message), so the per-signer message
++    # hash is no longer a hint.
++    limbs = Array(n_sigs * SIGPRESS_MSG_LIMBS)
++    hint_witness("message_limbs", limbs)
+     messages = Array(n_sigs * DIGEST_LEN)
+-    hint_witness("messages", messages)
++    for i in parallel_range(0, n_sigs):
++        sigpress_hash_message(limbs + i * SIGPRESS_MSG_LIMBS, messages + i * DIGEST_LEN)
+     computed_messages_hash = slice_hash_runtime(messages, n_sigs)
+-    copy_8(computed_messages_hash, message)
+ 
+     # 1->1 optimization: a single recursive single-message child, no raw signatures, no duplicates.
+     if n_recursions == 1:
+@@ -170,7 +176,23 @@ def main():
+ 
+     # General path
+     computed_pubkeys_hash = slice_hash_runtime(all_pubkeys, n_sigs)
+-    copy_8(computed_pubkeys_hash, pubkeys_hash_expected)
++
++    # sigpress binding v2 public-input layout (same size as the single-message layout):
++    #   pubkeys slot = D = compress(hash_slice(pubkeys), hash_slice(hash_message(m_i)))  (prover commitment)
++    #   message slot = v (5) | 0 0 0,   tweaks slot = r (5) | 0 0 0
++    # r is a challenge the gate derives from keccak(slot, n, D, pubkeys, messages) on chain; v is the
++    # evaluation at r of the polynomial whose coefficients are, signer by signer, pk_i (8) | limbs(m_i) (9).
++    d_commit = Array(DIGEST_LEN)
++    poseidon16_compress_half(computed_pubkeys_hash, computed_messages_hash, d_commit)
++    copy_8(d_commit, pubkeys_hash_expected)
++    r_chal = tweaks_hash_expected
++    tweaks_hash_expected[5] = 0
++    tweaks_hash_expected[6] = 0
++    tweaks_hash_expected[7] = 0
++    message[5] = 0
++    message[6] = 0
++    message[7] = 0
++    sigpress_bind_eval(all_pubkeys, limbs, n_sigs, r_chal, message)
+ 
+     # Buffer for partition verification
+     n_total = n_sigs + n_dup
+@@ -373,6 +395,46 @@ def absorb_n_pubkeys_const(
+     return counter, running_hash
+ 
+ 
++@inline
++def sigpress_hash_message(limbs, out):
++    # xmss::hash_message = poseidon16_compress([1004 | limbs (9) | 0*6]) (feed-forward, low 8 cells).
++    buf = Array(16)
++    buf[0] = SIGPRESS_DOMAINSEP_MESSAGE_HASH
++    for k in unroll(0, SIGPRESS_MSG_LIMBS):
++        buf[1 + k] = limbs[k]
++    for k in unroll(1 + SIGPRESS_MSG_LIMBS, 16):
++        buf[k] = 0
++    poseidon16_compress_half(buf, buf + DIGEST_LEN, out)
++    return
++
++
++def sigpress_bind_eval(pks, limbs, n, r, out):
++    # out = Horner over signers with rho = r^17 of s_i(r) = sum_k pk_i[k] r^k + sum_k limb_i[k] r^(8+k).
++    pw = Array(SIGPRESS_REC_LEN * DIM)
++    pw[0] = 1
++    for k in unroll(1, DIM):
++        pw[k] = 0
++    for k in unroll(1, SIGPRESS_REC_LEN):
++        dot_product_ee(pw + (k - 1) * DIM, r, pw + k * DIM)
++    rho = Array(DIM)
++    dot_product_ee(pw + (SIGPRESS_REC_LEN - 1) * DIM, r, rho)
++    acc = Array((n + 1) * DIM)
++    for k in unroll(0, DIM):
++        acc[k] = 0
++    for i in range(0, n):
++        t = Array(DIM)
++        dot_product_ee(acc + i * DIM, rho, t)
++        s1 = Array(DIM)
++        dot_product_be(pks + i * PUB_KEY_SIZE, pw, s1, PUB_KEY_SIZE)
++        s2 = Array(DIM)
++        dot_product_be(limbs + i * SIGPRESS_MSG_LIMBS, pw + PUB_KEY_SIZE * DIM, s2, SIGPRESS_MSG_LIMBS)
++        u = Array(DIM)
++        add_ee(t, s1, u)
++        add_ee(u, s2, acc + (i + 1) * DIM)
++    copy_ef(acc + n * DIM, out)
++    return
++
++
+ @inline
+ def sigpress_build_tweak_table(merkle_chunks):
+     # Same table as rec_aggregation::compute_tweak_table(slot), built from the slot bits.
+diff --git a/crates/spartan_whir_guest/src/bin/sigpress-binding-terminal.rs b/crates/spartan_whir_guest/src/bin/sigpress-bindv2-terminal.rs
+similarity index 98%
+rename from crates/spartan_whir_guest/src/bin/sigpress-binding-terminal.rs
+rename to crates/spartan_whir_guest/src/bin/sigpress-bindv2-terminal.rs
+index 651f7ca5..1d6cd725 100644
+--- a/crates/spartan_whir_guest/src/bin/sigpress-binding-terminal.rs
++++ b/crates/spartan_whir_guest/src/bin/sigpress-bindv2-terminal.rs
+@@ -392,7 +392,7 @@ fn run(timeout_seconds: u64) -> Result<(), Box<dyn Error>> {
+             raw.push((pk, signature, message));
+         }
+         let keygen_ms = keygen_started.elapsed().as_secs_f64() * 1000.0;
+-        let (public_input, mut witness, entries, preimage) =
++        let (public_input, mut witness, entries, preimage, stmt) =
+             rec_aggregation::prepare_raw_per_signer_execution(raw, slot)?;
+         if let Ok(spec) = std::env::var("SIGPRESS_MIN_LOG_ROWS") {
+             let rows: Vec<usize> = spec.split(',').map(|v| v.trim().parse()).collect::<Result<_, _>>()?;
+@@ -415,6 +415,11 @@ fn run(timeout_seconds: u64) -> Result<(), Box<dyn Error>> {
+             "public_input": base_words(&public_input),
+             "public_input_preimage_len": preimage.len(),
+             "public_input_preimage": base_words(&preimage),
++            "bind_v2": {
++                "d_commit": base_words(&stmt.d_commit),
++                "r": base_words(stmt.r.as_basis_coefficients_slice()),
++                "v": base_words(stmt.v.as_basis_coefficients_slice()),
++            },
+             "entries": entries_json,
+         }));
+         prepared.push((public_input, witness));
+@@ -429,7 +434,7 @@ fn run(timeout_seconds: u64) -> Result<(), Box<dyn Error>> {
+     let mutations = json!("not applicable to the sigpress XMSS child");
+     let preparation_ms = preparation.elapsed().as_secs_f64() * 1000.0;
+     let mut report = json!({
+-        "schema": "sigpress-binding-terminal-v1",
++        "schema": "sigpress-bindv2-terminal-v1",
+         "measurement": "diagnostic wall time; compilation and input preparation reported separately",
+         "profiles": profiles,
+         "node_arity": 2,
+@@ -439,7 +444,7 @@ fn run(timeout_seconds: u64) -> Result<(), Box<dyn Error>> {
+         "per_proving_operation_limit_seconds": timeout_seconds,
+         "preparation_ms": preparation_ms,
+         "applications": batches,
+-        "application_digest_rule": "child public input = poseidon_hash_slice(single-message layout: n_sigs, bytecode claim, domain sep, poseidon_hash_slice(pubkeys), poseidon_hash_slice(hash_message(m_i)...), merkle chunks(slot), zeros)",
++        "application_digest_rule": "child public input = poseidon_hash_slice(single-message layout: [1, n, 0*6], bytecode claim, domain sep, D = compress(hash_slice(pubkeys), hash_slice(hash_message(m_i))), v|000, merkle chunks(slot), r|000); r = keccak challenge (slot, n, D, pubkeys, messages); v = Horner_{r^17} of s_i(r) = sum pk_i[k] r^k + sum limb_i[k] r^(8+k)",
+         "guest_mutations": mutations,
+         "layers": [],
+     });
+diff --git a/crates/xmss/src/lib.rs b/crates/xmss/src/lib.rs
+index 27de788b..1b264578 100644
+--- a/crates/xmss/src/lib.rs
++++ b/crates/xmss/src/lib.rs
+@@ -35,7 +35,7 @@ pub const RANDOMNESS_LEN_FE: usize = 6;
+ /// Byte length of the messages being signed.
+ pub const MESSAGE_LEN_BYTES: usize = 32;
+ /// Field elements of the injective base-p embedding of a message (p > 2^30, 9 * 30 >= 8 * 32).
+-pub(crate) const MESSAGE_EMBEDDING_LEN_FE: usize = 9;
++pub const MESSAGE_EMBEDDING_LEN_FE: usize = 9;
+ /// Field elements of the hashed message, the form consumed by WOTS encoding (and the snark).
+ pub(crate) const MESSAGE_LEN_FE: usize = 8;
+ pub const PUBLIC_PARAM_LEN_FE: usize = 4;
+@@ -72,7 +72,7 @@ pub const MAX_SIGNING_ATTEMPTS: usize = 100_000;
+ /// Injective embedding of a message into `MESSAGE_EMBEDDING_LEN_FE` field elements:
+ /// little-endian base-p decomposition of the message read as a little-endian integer
+ /// (the same convention as leanSig's `encode_message`).
+-pub(crate) fn encode_message(message: &[u8; MESSAGE_LEN_BYTES]) -> [F; MESSAGE_EMBEDDING_LEN_FE] {
++pub fn encode_message(message: &[u8; MESSAGE_LEN_BYTES]) -> [F; MESSAGE_EMBEDDING_LEN_FE] {
+     let p = u64::from(F::ORDER_U32);
+     let mut words: [u32; MESSAGE_LEN_BYTES / 4] =
+         std::array::from_fn(|i| u32::from_le_bytes(message[4 * i..4 * (i + 1)].try_into().unwrap()));
