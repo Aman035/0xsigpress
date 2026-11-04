@@ -1,0 +1,7 @@
+{"step":"deploy_verifier","r":{"contractAddress":"0x92a964b177f2d6726121829df3218b9e667f4e9b","status":"0x1","gasUsed":"0xd97517","transactionHash":"0xbc69dcabdd3a10f786aa1f4dce3abd4b395addcac8a532412bb3c7fa6ccbd62d","estimate":"13572655"}}
+{"step":"eth_call_verifyC1V1","result":"0x0000000000000000000000000000000000000000000000000000000000000001"}
+{"step":"deploy_gate","r":{"contractAddress":"0x457f78edcdef6de1af2ce16ed62af567d0e5fef9","status":"0x1","gasUsed":"0x7ed78","transactionHash":"0xc038e32853b9493dbcb559e55ea8cf944c915ba5fa34ebba7ddd52925bcaa3ab","estimate":"494804"}}
+{"step":"register","r":{"status":"0x1","gasUsed":"0xe97c","transactionHash":"0xcf5754f60cd9e01ef365213ccf5f04567f56a35db48a71fc176e4fa438609d3c","estimate":"56926"}}
+{"step":"submit_swapped_roots_eth_call","result":"ROOT_MISMATCH"}
+{"step":"submit","r":{"status":"0x1","gasUsed":"0xc34710","transactionHash":"0x55212a0000c95dd33fcdc9510a32434afe1143dd73b1391bcde0098d79904f92","estimate":"12188298"}}
+{"step":"accepted","result":"true","verifier":"0x92a964b177f2d6726121829df3218b9e667f4e9b","gate":"0x457f78edcdef6de1af2ce16ed62af567d0e5fef9","left":"0xeaad7898beffecdf1307b1d0dcbe59bdac732f75722231629e5886e56ca33a76","right":"0x0ab8a68e4d9be29dbd9ba0c8612285b203a9fb00315823b1e9fb99278a2acf6d"}

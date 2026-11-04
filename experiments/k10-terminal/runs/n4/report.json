@@ -1,0 +1,372 @@
+{
+  "application_digest_rule": "child public input = poseidon_hash_slice(single-message input data: n_sigs, pubkeys hash, hash_message(batch_root), slot, tweaks hash, bytecode claim, domain sep)",
+  "applications": [
+    {
+      "batch_root_hex": "0xeaad7898beffecdf1307b1d0dcbe59bdac732f75722231629e5886e56ca33a76",
+      "keygen_sign_verify_ms": 23.8545,
+      "public_input": [
+        1570197288,
+        1396450181,
+        760090714,
+        268691437,
+        160801056,
+        514977909,
+        1937476615,
+        149908930
+      ],
+      "public_input_preimage_len": 168,
+      "side": "left",
+      "signers": 4,
+      "slot": 7
+    },
+    {
+      "batch_root_hex": "0x0ab8a68e4d9be29dbd9ba0c8612285b203a9fb00315823b1e9fb99278a2acf6d",
+      "keygen_sign_verify_ms": 26.029375,
+      "public_input": [
+        1638261877,
+        205297091,
+        1100618080,
+        256870303,
+        104608496,
+        1814413878,
+        1255430524,
+        1316631490
+      ],
+      "public_input_preimage_len": 168,
+      "side": "right",
+      "signers": 4,
+      "slot": 7
+    }
+  ],
+  "complete": true,
+  "distinct_child_statements": true,
+  "effective_threads": 10,
+  "guest_mutations": "not applicable to the sigpress XMSS child",
+  "layers": [
+    {
+      "bytecode_hash": [
+        1087953596,
+        906905200,
+        1478597046,
+        1717468718,
+        1424944435,
+        340644733,
+        1396736575,
+        1775092363
+      ],
+      "bytecode_instructions": 165912,
+      "bytecode_padded_instructions": 262144,
+      "layer": "direct_left",
+      "log_memory": 18,
+      "native_verification": "passed",
+      "process_peak_rss_bytes": 843104256,
+      "profiling_report": null,
+      "proof_bytes": 137530,
+      "proving_ms": 354.104292,
+      "proving_time_source": "current diagnostic",
+      "raw": {
+        "execution_rows": 3522,
+        "extension_rows": 115,
+        "memory_cells": 18013,
+        "poseidon_calls": 874
+      },
+      "reused_proof": false,
+      "stacked_entries": 988416,
+      "stacked_num_variables": 20,
+      "tables": {
+        "execution": {
+          "columns": 20,
+          "entries": 81920,
+          "log_rows": 12,
+          "rows": 4096
+        },
+        "extension_op": {
+          "columns": 29,
+          "entries": 7424,
+          "log_rows": 8,
+          "rows": 256
+        },
+        "poseidon16": {
+          "columns": 110,
+          "entries": 112640,
+          "log_rows": 10,
+          "rows": 1024
+        }
+      },
+      "verification_ms": 20.257542
+    },
+    {
+      "bytecode_hash": [
+        1087953596,
+        906905200,
+        1478597046,
+        1717468718,
+        1424944435,
+        340644733,
+        1396736575,
+        1775092363
+      ],
+      "bytecode_instructions": 165912,
+      "bytecode_padded_instructions": 262144,
+      "layer": "direct_right",
+      "log_memory": 18,
+      "native_verification": "passed",
+      "process_peak_rss_bytes": 844627968,
+      "profiling_report": null,
+      "proof_bytes": 138436,
+      "proving_ms": 1129.75825,
+      "proving_time_source": "current diagnostic",
+      "raw": {
+        "execution_rows": 3515,
+        "extension_rows": 109,
+        "memory_cells": 18013,
+        "poseidon_calls": 874
+      },
+      "reused_proof": false,
+      "stacked_entries": 988416,
+      "stacked_num_variables": 20,
+      "tables": {
+        "execution": {
+          "columns": 20,
+          "entries": 81920,
+          "log_rows": 12,
+          "rows": 4096
+        },
+        "extension_op": {
+          "columns": 29,
+          "entries": 7424,
+          "log_rows": 8,
+          "rows": 256
+        },
+        "poseidon16": {
+          "columns": 110,
+          "entries": 112640,
+          "log_rows": 10,
+          "rows": 1024
+        }
+      },
+      "verification_ms": 20.273417
+    },
+    {
+      "bytecode_hash": [
+        1046685185,
+        62876622,
+        394859386,
+        195649379,
+        294772300,
+        2104690551,
+        136151592,
+        496073325
+      ],
+      "bytecode_instructions": 117427,
+      "bytecode_padded_instructions": 131072,
+      "layer": "lift_left",
+      "log_memory": 18,
+      "native_verification": "passed",
+      "process_peak_rss_bytes": 3313057792,
+      "profiling_report": null,
+      "proof_bytes": 107424,
+      "proving_ms": 8752.379834,
+      "proving_time_source": "current diagnostic",
+      "raw": {
+        "execution_rows": 83124,
+        "extension_rows": 26680,
+        "memory_cells": 222292,
+        "poseidon_calls": 6381
+      },
+      "reused_proof": false,
+      "stacked_entries": 5128192,
+      "stacked_num_variables": 23,
+      "tables": {
+        "execution": {
+          "columns": 20,
+          "entries": 2621440,
+          "log_rows": 17,
+          "rows": 131072
+        },
+        "extension_op": {
+          "columns": 29,
+          "entries": 950272,
+          "log_rows": 15,
+          "rows": 32768
+        },
+        "poseidon16": {
+          "columns": 110,
+          "entries": 901120,
+          "log_rows": 13,
+          "rows": 8192
+        }
+      },
+      "verification_ms": 22.181042
+    },
+    {
+      "bytecode_hash": [
+        1046685185,
+        62876622,
+        394859386,
+        195649379,
+        294772300,
+        2104690551,
+        136151592,
+        496073325
+      ],
+      "bytecode_instructions": 117427,
+      "bytecode_padded_instructions": 131072,
+      "layer": "lift_right",
+      "log_memory": 18,
+      "native_verification": "passed",
+      "process_peak_rss_bytes": 3512991744,
+      "profiling_report": null,
+      "proof_bytes": 107335,
+      "proving_ms": 8458.640041,
+      "proving_time_source": "current diagnostic",
+      "raw": {
+        "execution_rows": 83124,
+        "extension_rows": 26680,
+        "memory_cells": 222292,
+        "poseidon_calls": 6381
+      },
+      "reused_proof": false,
+      "stacked_entries": 5128192,
+      "stacked_num_variables": 23,
+      "tables": {
+        "execution": {
+          "columns": 20,
+          "entries": 2621440,
+          "log_rows": 17,
+          "rows": 131072
+        },
+        "extension_op": {
+          "columns": 29,
+          "entries": 950272,
+          "log_rows": 15,
+          "rows": 32768
+        },
+        "poseidon16": {
+          "columns": 110,
+          "entries": 901120,
+          "log_rows": 13,
+          "rows": 8192
+        }
+      },
+      "verification_ms": 23.433584
+    },
+    {
+      "bytecode_hash": [
+        10624309,
+        1729484499,
+        1914237767,
+        800518908,
+        1987782872,
+        655475297,
+        1734479488,
+        1669153618
+      ],
+      "bytecode_instructions": 122520,
+      "bytecode_padded_instructions": 131072,
+      "layer": "binary_root_c1",
+      "log_memory": 19,
+      "native_verification": "passed",
+      "process_peak_rss_bytes": 5871599616,
+      "profiling_report": null,
+      "proof_bytes": 110531,
+      "proving_ms": 22190.584542,
+      "raw": {
+        "execution_rows": 123248,
+        "extension_rows": 32154,
+        "memory_cells": 337055,
+        "poseidon_calls": 7831
+      },
+      "stacked_entries": 5652480,
+      "stacked_num_variables": 23,
+      "tables": {
+        "execution": {
+          "columns": 20,
+          "entries": 2621440,
+          "log_rows": 17,
+          "rows": 131072
+        },
+        "extension_op": {
+          "columns": 29,
+          "entries": 950272,
+          "log_rows": 15,
+          "rows": 32768
+        },
+        "poseidon16": {
+          "columns": 110,
+          "entries": 901120,
+          "log_rows": 13,
+          "rows": 8192
+        }
+      },
+      "verification_ms": 62.367667000000004
+    }
+  ],
+  "lift_compilation_ms": 912.770625,
+  "measurement": "diagnostic wall time; compilation and input preparation reported separately",
+  "native_verification": "passed at all five LeanVM proofs",
+  "negative_checks": [
+    "changed application root rejected",
+    "changed original program evaluation rejected",
+    "wrong terminal profile rejected",
+    "wrong fixed-program commitment rejected"
+  ],
+  "node_arity": 2,
+  "node_compilation_ms": 1127.795166,
+  "per_proving_operation_limit_seconds": 0,
+  "preparation_ms": 1625.1542909999998,
+  "profiles": {
+    "direct": {
+      "first_folding_factor": 6,
+      "grinding_bits": 22,
+      "log_inv_rate": 1,
+      "max_num_variables_to_send_coeffs": 5,
+      "rs_domain_initial_reduction_factor": 2,
+      "security_bits": 100,
+      "subsequent_folding_factor": 4
+    },
+    "fixed_child_shape": false,
+    "guest_extension_arithmetic": true,
+    "guest_transcript_blocks": true,
+    "lift": {
+      "first_folding_factor": 5,
+      "grinding_bits": 24,
+      "log_inv_rate": 4,
+      "max_num_variables_to_send_coeffs": 3,
+      "rs_domain_initial_reduction_factor": 1,
+      "security_bits": 100,
+      "subsequent_folding_factor": 4
+    },
+    "lift_child_num_variables": 20,
+    "node": {
+      "first_folding_factor": 5,
+      "grinding_bits": 28,
+      "log_inv_rate": 6,
+      "max_num_variables_to_send_coeffs": 6,
+      "rs_domain_initial_reduction_factor": 1,
+      "security_bits": 100,
+      "subsequent_folding_factor": 4
+    },
+    "node_child_num_variables": 23,
+    "terminal_grouped_logup": false,
+    "terminal_keccak": true,
+    "terminal_num_variables": null,
+    "terminal_public_memory": true,
+    "terminal_two_commitment": true,
+    "verifier_options": {
+      "extension_subtractions": true,
+      "fft_poseidon_mds": true,
+      "horner_evaluation": true
+    }
+  },
+  "schema": "sigpress-xmss-terminal-experiment-v1",
+  "terminal_c1_preprocessing": {
+    "fixed_commitment_ms": 2286.0044999999996,
+    "fixed_polynomial_ms": 12.406083,
+    "timing_boundary": "application preprocessing outside online proving and native verification",
+    "total_ms": 2298.4105829999994
+  },
+  "terminal_export": "native proof, raw transcript, Merkle openings, fixed bytecode polynomials, and authenticated claims exported",
+  "total_leanvm_proving_ms": 40885.466959,
+  "vm_profiling": false
+}
