@@ -1,0 +1,33 @@
+diff --git a/script/generate_leanvm_two_commitment_terminal_fixture.py b/script/generate_leanvm_two_commitment_terminal_fixture.py
+index 6ad3812..fb9d8ed 100644
+--- a/script/generate_leanvm_two_commitment_terminal_fixture.py
++++ b/script/generate_leanvm_two_commitment_terminal_fixture.py
+@@ -2,6 +2,7 @@
+ """Generate the Solidity fixture for the version-one terminal C1 proof."""
+ 
+ import argparse
++import os
+ import hashlib
+ import json
+ import sys
+@@ -991,7 +992,10 @@ def main(grouped=False):
+ 
+     fixture, programs, claims, lifted_capacity, proof_path, transcript_offsets = validate_fixture(
+         args.root_fixture,
+-        require_current_source=args.require_current_source or not args.validate_only,
++        # sigpress: SIGPRESS_NO_PROVENANCE=1 skips the upstream runner's source-provenance check;
++        # our fixture comes from sigpress-xmss-terminal, not run_terminal_fixture.py.
++        require_current_source=(args.require_current_source or not args.validate_only)
++        and os.environ.get("SIGPRESS_NO_PROVENANCE") != "1",
+         grouped=grouped,
+     )
+     opening_bytes, opening_groups, compressed_transcript_fields = pruned_openings(
+@@ -1112,7 +1116,7 @@ def main(grouped=False):
+         commitment_key: fixture[commitment_key],
+         "programs": programs,
+         "root_profile": fixture["profiles"]["node"],
+-        "source_provenance": fixture["source_provenance"],
++        "source_provenance": fixture.get("source_provenance", "sigpress: none (SIGPRESS_NO_PROVENANCE=1)"),
+         "source_sha256": {
+             str(path.relative_to(REPO)): sha256(path) for path in sorted(set(source_files))
+         },
