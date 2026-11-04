@@ -1,0 +1,16 @@
+aggregation bytecode: 291,396 instructions (2^19 padded), compiled in 0.586 s
+
+recursion 4→1, over leaves of 1,024 leanXMSS signatures
+  cycles (VM steps)           : 1,404,514 = 2^20.422
+    details                   : MUL 2^19.027 (38.0%)  XOR 2^18.636 (29.0%)  DEREF 2^18.11 (20.1%)  SET 2^16.301 (5.7%)  JUMP 2^15.984 (4.6%)  KECCAK 2^15.072 (2.5%)  MEMORY 2^21.125  BYTECODE 2^18.153  TOTAL_COMMITTED 2^25.755
+  proof size                  : 342.6 KiB
+  proving time                : 0.942 s      peak memory 3.59 GiB
+  verifying                   : 10.783 ms
+       14.48 real        77.84 user         5.96 sys
+          6216990720  maximum resident set size
+             1193626  page reclaims
+                   2  voluntary context switches
+               83699  involuntary context switches
+        180710593115  instructions retired
+         53150443091  cycles elapsed
+          3866103096  peak memory footprint

@@ -1,0 +1,15 @@
+== aggregate --xmss 256 --log-inv-rate 1
+  [k5 bytes] proof_size 306992  to_bytes_without_pubkeys 307553  to_bytes (with signer set) 323953
+  [k6 count, one verify] keccak-f perms (all, SIMD lanes incl.) 128  keccak256 hash() calls 3  hash_many inputs 0  raw keccak_f (duplex transcript etc.) 128  F64 mul 0  F192 mul 0
+  [k6 verifier count] keccak_f_total 6570 keccak256_calls 4778 keccak256_bytes 447104 merkle_pair 4426 merkle_leaf 352 leaf_bytes 163840 transcript_duplex_perm 862 E*E 105275 E*K 19996 K*K 12210 E*table 37888
+== aggregate --xmss 1024 --log-inv-rate 1
+  [k5 bytes] proof_size 334104  to_bytes_without_pubkeys 334665  to_bytes (with signer set) 400217
+  [k6 count, one verify] keccak-f perms (all, SIMD lanes incl.) 489  keccak256 hash() calls 3  hash_many inputs 0  raw keccak_f (duplex transcript etc.) 489  F64 mul 0  F192 mul 0
+  [k6 verifier count] keccak_f_total 7396 keccak256_calls 5524 keccak256_bytes 495616 merkle_pair 5170 merkle_leaf 354 leaf_bytes 164736 transcript_duplex_perm 937 E*E 107402 E*K 20790 K*K 13875 E*table 37888
+== aggregate --xmss 2048 --log-inv-rate 1
+  [k5 bytes] proof_size 357408  to_bytes_without_pubkeys 357969  to_bytes (with signer set) 489057
+  [k6 count, one verify] keccak-f perms (all, SIMD lanes incl.) 971  keccak256 hash() calls 3  hash_many inputs 0  raw keccak_f (duplex transcript etc.) 971  F64 mul 0  F192 mul 0
+  [k6 verifier count] keccak_f_total 7995 keccak256_calls 6060 keccak256_bytes 534400 merkle_pair 5692 merkle_leaf 368 leaf_bytes 170112 transcript_duplex_perm 972 E*E 108717 E*K 21172 K*K 14776 E*table 37888
+== recursion --n 4 --xmss-per-leaf 1024 --log-inv-rate 2
+  [k6 verifier count] keccak_f_total 4777 keccak256_calls 3368 keccak256_bytes 300928 merkle_pair 3146 merkle_leaf 222 leaf_bytes 99584 transcript_duplex_perm 851 E*E 102518 E*K 10474 K*K 7502 E*table 37888
+  proof size                  : 245.5 KiB

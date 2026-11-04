@@ -1,0 +1,256 @@
+diff --git a/bins/leanvm/src/benchmark.rs b/bins/leanvm/src/benchmark.rs
+index f0fd3a61..ee42902f 100644
+--- a/bins/leanvm/src/benchmark.rs
++++ b/bins/leanvm/src/benchmark.rs
+@@ -108,6 +108,18 @@ pub fn run_aggregation(n_lean_xmss: usize, n_lean_sphincs: usize, n_blobs: usize
+         sig.verify().expect("the leaf aggregate verifies");
+     });
+     drop(trace_span);
++    {
++        use std::sync::atomic::Ordering::Relaxed;
++        use primitives::count::*;
++        ON.store(true, Relaxed);
++        sig.verify().expect("the leaf aggregate verifies");
++        ON.store(false, Relaxed);
++        let wire = sig.to_bytes();
++        let wire_np = sig.to_bytes_without_pubkeys();
++        println!("  [k6 count, one verify] keccak-f perms (all, SIMD lanes incl.) {}  keccak256 hash() calls {}  hash_many inputs {}  raw keccak_f (duplex transcript etc.) {}  F64 mul {}  F192 mul {}",
++            PERM.load(Relaxed), HASH_CALLS.load(Relaxed), HASH_MANY_INPUTS.load(Relaxed), RAW_F.load(Relaxed), F64MUL.load(Relaxed), F192MUL.load(Relaxed));
++        println!("  [k5 bytes] proof_size {}  to_bytes_without_pubkeys {}  to_bytes (with signer set) {}", sig.proof_size(), wire_np.len(), wire.len());
++    }
+ 
+     let mut inputs = Vec::new();
+     if n_lean_xmss > 0 || n_lean_sphincs > 0 {
+diff --git a/crates/primitives/src/field/gf2_64.rs b/crates/primitives/src/field/gf2_64.rs
+index ae87eaa3..e42369a7 100644
+--- a/crates/primitives/src/field/gf2_64.rs
++++ b/crates/primitives/src/field/gf2_64.rs
+@@ -147,6 +147,7 @@ impl Mul for F64 {
+     type Output = Self;
+     #[inline]
+     fn mul(self, rhs: Self) -> Self {
++        crate::count::add(&crate::count::F64MUL, 1);
+         #[cfg(all(target_arch = "aarch64", target_feature = "aes"))]
+         {
+             // SAFETY: aes target feature is enabled at compile time.
+diff --git a/crates/primitives/src/field/gf2_64x3.rs b/crates/primitives/src/field/gf2_64x3.rs
+index 2c444142..8342e320 100644
+--- a/crates/primitives/src/field/gf2_64x3.rs
++++ b/crates/primitives/src/field/gf2_64x3.rs
+@@ -199,6 +199,7 @@ impl Mul for F192 {
+     type Output = Self;
+     #[inline]
+     fn mul(self, rhs: Self) -> Self {
++        crate::count::add(&crate::count::F192MUL, 1);
+         #[cfg(all(target_arch = "aarch64", target_feature = "aes"))]
+         {
+             aarch64::mul(self, rhs)
+diff --git a/crates/primitives/src/hash.rs b/crates/primitives/src/hash.rs
+index 1bc29b14..ae46bf0e 100644
+--- a/crates/primitives/src/hash.rs
++++ b/crates/primitives/src/hash.rs
+@@ -150,6 +150,7 @@ trait Lanes64: Copy {
+ /// one that forms every lane before χ and every parity after it.
+ #[inline(always)]
+ fn permute<S: Lanes64>(a: &mut [S; STATE_LANES]) {
++    crate::count::add(&crate::count::PERM, S::WIDTH as u64);
+     let mut c: [S; 5] = std::array::from_fn(|x| S::xor5(a[x], a[x + 5], a[x + 10], a[x + 15], a[x + 20]));
+     for &rc in &RC {
+         let d: [S; 5] = std::array::from_fn(|x| S::theta_d(c[(x + 4) % 5], c[(x + 1) % 5]));
+@@ -226,6 +227,7 @@ pub fn keccak_f(a: &mut [u64; STATE_LANES]) {
+ #[cfg(not(all(target_arch = "x86_64", target_feature = "avx512f")))]
+ #[inline]
+ pub fn keccak_f(state: &mut [u64; STATE_LANES]) {
++    crate::count::add(&crate::count::RAW_F, 1);
+     permute(state);
+ }
+ 
+@@ -316,6 +318,7 @@ impl Default for Hasher {
+ /// Keccak-256 of `data`, Ethereum's `keccak256`: FIPS 202's sponge over Keccak-f\[1600\] with
+ /// rate [`RATE`] and Keccak's original padding.
+ pub fn hash(data: &[u8]) -> [u8; OUT_LEN] {
++    crate::count::add(&crate::count::HASH_CALLS, 1);
+     hash_from_state(data, &[0; STATE_LANES])
+ }
+ 
+@@ -675,6 +678,7 @@ pub fn hash_many(data: &[u8], len: usize, out: &mut [u8]) {
+ /// [`hash_many`] continued from one sponge state shared by every input, which has absorbed
+ /// whole blocks (see [`zero_prefix_state`]). Byte-identical to hashing each full image.
+ pub fn hash_many_from_state(data: &[u8], len: usize, state: &[u64; STATE_LANES], out: &mut [u8]) {
++    crate::count::add(&crate::count::HASH_MANY_INPUTS, (out.len() / OUT_LEN) as u64);
+     hash_many_with::<Backend>(data, len, state, out)
+ }
+ 
+@@ -738,6 +742,7 @@ fn digest_halves_from_with<S: Lanes64>(template: &[u64; STATE_LANES], at: usize,
+ 
+ /// Keccak-f\[1600\] of every state in place, [`LANES`] at a time.
+ pub fn keccak_f_many(states: &mut [[u64; STATE_LANES]]) {
++    crate::count::add(&crate::count::RAW_F, states.len() as u64);
+     let (groups, rest) = states.as_chunks_mut::<LANES>();
+     for group in groups {
+         permute_group::<Backend>(group);
+diff --git a/crates/primitives/src/lib.rs b/crates/primitives/src/lib.rs
+index 527db6ea..16666b29 100644
+--- a/crates/primitives/src/lib.rs
++++ b/crates/primitives/src/lib.rs
+@@ -1,6 +1,23 @@
+ //! Shared primitives: field kernels, bit transposes, multilinear helpers, and
+ //! small integer utilities.
+ 
++/// K5/K6 instrumentation (sigpress, not upstream): counts work done while ON is set.
++pub mod count {
++    use std::sync::atomic::{AtomicBool, AtomicU64};
++    pub static ON: AtomicBool = AtomicBool::new(false);
++    pub static PERM: AtomicU64 = AtomicU64::new(0);
++    pub static HASH_CALLS: AtomicU64 = AtomicU64::new(0);
++    pub static HASH_MANY_INPUTS: AtomicU64 = AtomicU64::new(0);
++    pub static RAW_F: AtomicU64 = AtomicU64::new(0);
++    pub static F64MUL: AtomicU64 = AtomicU64::new(0);
++    pub static F192MUL: AtomicU64 = AtomicU64::new(0);
++    #[inline(always)]
++    pub fn add(c: &AtomicU64, n: u64) {
++        use std::sync::atomic::Ordering::Relaxed;
++        if ON.load(Relaxed) { c.fetch_add(n, Relaxed); }
++    }
++}
++
+ pub mod bit_fold;
+ pub mod bits;
+ pub mod field;
+diff --git a/crates/verifier/src/field.rs b/crates/verifier/src/field.rs
+index 2377efc0..0d480fa5 100644
+--- a/crates/verifier/src/field.rs
++++ b/crates/verifier/src/field.rs
+@@ -98,6 +98,7 @@ impl Add for K {
+ impl Mul for K {
+     type Output = Self;
+     fn mul(self, rhs: Self) -> Self {
++        crate::count::add(&crate::count::KMUL, 1);
+         Self(base_mul(self.0, rhs.0))
+     }
+ }
+@@ -192,6 +193,7 @@ impl Mul for E {
+     type Output = Self;
+     /// Karatsuba: six base products into the coefficients of y^0..y^4, then y^3 = y + 1 folds them back into three limbs.
+     fn mul(self, rhs: Self) -> Self {
++        crate::count::add(&crate::count::EMUL, 1);
+         let (a, b) = (self, rhs);
+         let (p0, p1, p2) = (clmul(a.c0, b.c0), clmul(a.c1, b.c1), clmul(a.c2, b.c2));
+         let e1 = clmul(a.c0 ^ a.c1, b.c0 ^ b.c1) ^ p0 ^ p1;
+@@ -204,6 +206,7 @@ impl Mul for E {
+ impl Mul<K> for E {
+     type Output = Self;
+     fn mul(self, rhs: K) -> Self {
++        crate::count::add(&crate::count::EKMUL, 1);
+         Self::new(
+             base_mul(self.c0, rhs.0),
+             base_mul(self.c1, rhs.0),
+@@ -254,6 +257,7 @@ impl Scaled {
+ 
+     #[inline]
+     pub fn mul(&self, a: E) -> E {
++        crate::count::add(&crate::count::TMUL, 1);
+         let mut product = ZERO;
+         let mut table = 0;
+         for limb in [a.c0, a.c1, a.c2] {
+diff --git a/crates/verifier/src/hash.rs b/crates/verifier/src/hash.rs
+index ab93e0c8..6b4aeef7 100644
+--- a/crates/verifier/src/hash.rs
++++ b/crates/verifier/src/hash.rs
+@@ -48,6 +48,7 @@ pub const KECCAK_PI: [usize; STATE_LANES] = {
+     pi
+ };
+ pub fn keccak_f(a: &mut [u64; STATE_LANES]) {
++    crate::count::add(&crate::count::PERM, 1);
+     for rc in KECCAK_RC {
+         // Row by row, so every index is a constant: an index computed per lane vectorizes to gathers.
+         let c: [u64; 5] = std::array::from_fn(|x| a[x] ^ a[x + 5] ^ a[x + 10] ^ a[x + 15] ^ a[x + 20]);
+@@ -77,6 +78,8 @@ fn xor_block(state: &mut [u64; STATE_LANES], block: &[u8; RATE]) {
+ /// Keccak-256 of `data`: 136-byte blocks, the last holding the remaining 0 to 135 bytes and the padding
+ /// `0x01 ‖ 0^* ‖ 0x80`.
+ pub fn keccak_hash(data: &[u8]) -> Digest {
++    crate::count::add(&crate::count::HASH, 1);
++    crate::count::add(&crate::count::HASH_BYTES, data.len() as u64);
+     let mut state = [0u64; STATE_LANES];
+     let (blocks, tail) = data.as_chunks::<RATE>();
+     for block in blocks {
+diff --git a/crates/verifier/src/lib.rs b/crates/verifier/src/lib.rs
+index 6373c358..43da8b45 100644
+--- a/crates/verifier/src/lib.rs
++++ b/crates/verifier/src/lib.rs
+@@ -8,6 +8,30 @@
+ 
+ #![forbid(unsafe_code)]
+ 
++/// K5/K6 instrumentation (sigpress, not upstream).
++pub mod count {
++    use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
++    pub static PERM: AtomicU64 = AtomicU64::new(0);
++    pub static HASH: AtomicU64 = AtomicU64::new(0);
++    pub static HASH_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static MERKLE_PAIR: AtomicU64 = AtomicU64::new(0);
++    pub static LEAF: AtomicU64 = AtomicU64::new(0);
++    pub static LEAF_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static TRANSCRIPT: AtomicU64 = AtomicU64::new(0);
++    pub static EMUL: AtomicU64 = AtomicU64::new(0);
++    pub static EKMUL: AtomicU64 = AtomicU64::new(0);
++    pub static KMUL: AtomicU64 = AtomicU64::new(0);
++    pub static TMUL: AtomicU64 = AtomicU64::new(0);
++    pub fn add(c: &AtomicU64, n: u64) { c.fetch_add(n, Relaxed); }
++    pub fn all() -> [&'static AtomicU64; 11] { [&PERM,&HASH,&HASH_BYTES,&MERKLE_PAIR,&LEAF,&LEAF_BYTES,&TRANSCRIPT,&EMUL,&EKMUL,&KMUL,&TMUL] }
++    pub fn reset() { for c in all() { c.store(0, Relaxed); } }
++    pub fn report() {
++        let v: Vec<u64> = all().iter().map(|c| c.load(Relaxed)).collect();
++        eprintln!("  [k6 verifier count] keccak_f_total {} keccak256_calls {} keccak256_bytes {} merkle_pair {} merkle_leaf {} leaf_bytes {} transcript_duplex_perm {} E*E {} E*K {} K*K {} E*table {}",
++            v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],v[9],v[10]);
++    }
++}
++
+ mod bus;
+ mod bytecode;
+ pub mod da;
+@@ -167,7 +191,10 @@ pub struct Summary {
+ 
+ /// Verify that `proof` shows an execution of `bytecode` (the stacked bytecode multilinear) on the 256-bit `public_input`.
+ pub fn verify_execution(bytecode: &Bytecode, public_input: &[u8; 32], proof: &Proof) -> Result<Summary, VerifierError> {
+-    walk(bytecode, public_input, proof, true)
++    count::reset();
++    let r = walk(bytecode, public_input, proof, true);
++    if std::env::var_os("K6_COUNT").is_some() { count::report(); }
++    r
+ }
+ 
+ /// NOT a verification: the [`Summary`] of `proof`, read out without checking it. An invalid proof is accepted.
+diff --git a/crates/verifier/src/merkle.rs b/crates/verifier/src/merkle.rs
+index 28b044c6..fa851164 100644
+--- a/crates/verifier/src/merkle.rs
++++ b/crates/verifier/src/merkle.rs
+@@ -35,6 +35,7 @@ pub struct PrunedMerklePaths {
+ }
+ 
+ pub fn hash_pair(left: &[u8], right: &[u8]) -> Digest {
++    crate::count::add(&crate::count::MERKLE_PAIR, 1);
+     let mut pair = [0u8; 64];
+     pair[..32].copy_from_slice(left);
+     pair[32..].copy_from_slice(right);
+@@ -42,6 +43,8 @@ pub fn hash_pair(left: &[u8], right: &[u8]) -> Digest {
+ }
+ 
+ fn hash_leaf(image: &[K]) -> Digest {
++    crate::count::add(&crate::count::LEAF, 1);
++    crate::count::add(&crate::count::LEAF_BYTES, 8 * image.len() as u64);
+     keccak_hash(&image.iter().flat_map(|word| word.to_bytes()).collect::<Vec<u8>>())
+ }
+ 
+diff --git a/crates/verifier/src/transcript.rs b/crates/verifier/src/transcript.rs
+index 9f53b14a..2533d2e0 100644
+--- a/crates/verifier/src/transcript.rs
++++ b/crates/verifier/src/transcript.rs
+@@ -66,6 +66,7 @@ impl Sponge {
+         for (i, &(value, tag)) in self.pending[..self.n_pending].iter().enumerate() {
+             input[4 * i..4 * i + 4].copy_from_slice(&[value.c0, value.c1, value.c2, tag]);
+         }
++        crate::count::add(&crate::count::TRANSCRIPT, 1);
+         keccak_f(&mut input);
+         self.state = input;
+         self.n_pending = 0;

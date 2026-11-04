@@ -1,0 +1,22 @@
+
+thread 'main' (1152497) panicked at bins/leanvm/src/benchmark.rs:104:10:
+leaf aggregates: ProofError(SnarkProveError(WitnessOutOfRange { log_committed: 29 }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+       64.45 real       492.67 user         5.30 sys
+          5029380096  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              621525  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   6  voluntary context switches
+              838648  involuntary context switches
+       4560285634823  instructions retired
+       1449211112652  cycles elapsed
+          8496192712  peak memory footprint

@@ -1,0 +1,26 @@
+
+aggregation, 2,048 leanXMSS signatures
+  cycles (VM steps)           : 2,286,834 = 2^21.125
+    details                   : XOR 2^19.224 (26.8%)  SET 2^18.699 (18.6%)  MUL 2^18.678 (18.3%)  KECCAK 2^18.543 (16.7%)  DEREF 2^18.106 (12.3%)  JUMP 2^17.336 (7.2%)  MEMORY 2^23.657  BYTECODE 2^18.153  TOTAL_COMMITTED 2^27.2
+  proof size                  : 349.0 KiB
+  proving time                : 28.449 s      peak memory 5.514 GiB
+  per signature               : 71.989 signatures/s
+  verifying                   : 45.938 ms
+       71.61 real       291.45 user        34.47 sys
+          5920784384  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             3797720  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              203653  voluntary context switches
+              918286  involuntary context switches
+       3087742913579  instructions retired
+       1036112579103  cycles elapsed
+         12796815080  peak memory footprint
