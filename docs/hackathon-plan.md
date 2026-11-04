@@ -88,19 +88,19 @@ Repo layout:
 
 ## Checklist: Sumith (core)
 
-- [ ] Plan doc committed and pushed
+- [x] Plan doc committed and pushed
 - [ ] `contracts/` Foundry project, `WOTS.sol` per spec
-- [ ] `NaiveLane.sol` + tests (valid sig passes, flipped bit reverts)
-- [ ] `OptimisticAggregator.sol` + tests (submit, challenge bad sig → slash, challenge good sig → revert, finalize after window)
-- [ ] Gas report: naive verify gas, `submitBatch` gas
+- [x] `NaiveLane.sol` + tests (valid sig passes, flipped bit reverts)
+- [x] `OptimisticAggregator.sol` + tests (submit, challenge bad sig → slash, challenge good sig → revert, finalize after window)
+- [x] Gas report: naive verify gas, `submitBatch` gas
 - [ ] `aggregator/` TS: `wots.ts`, `merkle.ts` per spec, unit tests
-- [ ] Cross-check: TS-made signature verifies in the Solidity contract (anvil)
-- [ ] Deploy script; deploy both contracts to Monad testnet (chain 10143); write `deployments.json`
-- [ ] `naive.ts`: one naive tx on testnet → gas + bytes
-- [ ] `demo.ts`: batch of N (e.g. 256) ops → one `submitBatch` tx
-- [ ] `tamper.ts`: batch with one bad sig → `challenge` → slashed on chain
-- [ ] `results.json` to `web/public/`; numbers into `decisions.md` (measured, with tx hashes)
-- [ ] Deployer key in `.env` (`PRIVATE_KEY`, never committed), funded from faucet
+- [x] Cross-check: TS-made signature verifies in the Solidity contract (anvil)
+- [x] Deploy script; deploy both contracts to Monad testnet (chain 10143); write `deployments.json`
+- [x] `naive.ts`: one naive tx on testnet → gas + bytes
+- [x] `demo.ts`: batch of N (e.g. 256) ops → one `submitBatch` tx
+- [x] `tamper.ts`: batch with one bad sig → `challenge` → slashed on chain
+- [x] `results.json` to `web/public/`; numbers into `decisions.md` (measured, with tx hashes)
+- [x] Deployer key in `.env` (`PRIVATE_KEY`, never committed), funded from faucet
 
 ## Checklist: Aman (docs, site, pitch)
 
@@ -128,7 +128,7 @@ Repo layout:
 
 - [x] Core contracts + TS, tests green (forge 20/20, TS 11/11), TS ↔ Solidity vector match
 - [x] One-shot testnet run: `./scripts/testnet.sh` (needs funded `PRIVATE_KEY` in `.env`)
-- [ ] Fund deployer `0x445a0c4780a8107158df60B18Ee5372497dc1D12` from the faucet, run testnet script
-- [ ] `PQAccount` + factory: accounts execute ops only from finalized batches (key rotates each op); `executeDirect` single-op fallback; `pnpm execute` script
+- [x] Fund deployer `0x445a0c4780a8107158df60B18Ee5372497dc1D12` from the faucet, run testnet script
+- [x] `PQAccount` + factory: accounts execute ops only from finalized batches (key rotates each op); `executeDirect` single-op fallback; `pnpm execute` script
 - [ ] K3: proof-system survey in `experiments/k3/`, local K4 data point (Solidity STARK/WHIR verifier gas on anvil)
-- [ ] Testnet numbers into `docs/decisions.md` and `web/public/results.json` (Aman wires them into the page)
+- [x] Testnet numbers into `docs/decisions.md` and `web/public/results.json` (Aman wires them into the page)
