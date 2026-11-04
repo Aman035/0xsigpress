@@ -58,7 +58,7 @@ None of these are deployed. The live testnet contracts keep the old behaviour un
 | `OptimisticAggregator` | SR-03 exact membership, SR-05 window bound | New `depthOf(uint256)`, new error `BadWindow()`. Same hash format. Contracts bound to the old address (PQAccount, XMSSAccount, PQAccount4337/factory, SigpressAggregator4337, SigpressEntry) must be redeployed against the new one to get the fix. |
 | `SigpressEntry` | SR-01 dead-op records, SR-06 | **Bundle format extension**, backward compatible: an accountIndex with the top bit set (`0x80000000`) now means a dead-op record. Old bundles never set it, since that bit would need 2^31 accounts. New errors `OpNotDead(uint256)` and `NoAccounts()`, new event `OpSkipped(uint256,uint256)`. The signing format is unchanged. |
 | `SigpressAccount` (impl, deployed by the entry) | SR-02, SR-04 | New `OP_GAS_LIMIT()` constant, new error `InsufficientGas()`. The bundled-op gas budget changes behaviour (see above). |
-| TS `aggregator/src/compact.ts` | Updated | `encodeDeadOp`, `DeadBundleOp` (`dead: true, nonce, pkHash`) accepted by `encodeBundle`/`bundleCalldata`, `decodeBundle` returns `dead`/`dataHash`/`nonce`/`pkHash`. Account index capped at 2^31 − 1. New errors and the event are in the ABIs. Tests are in `aggregator/test/compact.test.ts`. **Not wired into `aggregator/src/service/*`** (owned by another agent): the batcher should encode an op as dead when the account's `nonce`/`pkHash` has moved past it, then retry. |
+| TS `aggregator/src/compact.ts` | Updated | `encodeDeadOp`, `DeadBundleOp` (`dead: true, nonce, pkHash`) accepted by `encodeBundle`/`bundleCalldata`, `decodeBundle` returns `dead`/`dataHash`/`nonce`/`pkHash`. Account index capped at 2^31 − 1. New errors and the event are in the ABIs. Tests are in `aggregator/test/compact.test.ts`. The service batcher (`aggregator/src/service/*`, another agent's work, commit 9baf0be) already sends moved ops as dead-op records. |
 
 ## Invariants and fuzzing added
 
@@ -117,11 +117,13 @@ None of these are deployed. The live testnet contracts keep the old behaviour un
 2. **Bond economics (SR-R2).** The bond is tiny compared with what a batch can move, it is refunded on
    self-challenge, and challenges can be front-run. Liveness also depends on an honest challenger being
    online for each window.
-3. **The trusted registrar in the STARK gate** (K10 `SigpressTerminalGate`, `experiments/`, not reviewed
-   here). The validity path proves "these signatures verify under these keys", but which key belongs to
-   which account is bound by a trusted registrar wallet, not in the proof. A compromised registrar can
-   bind its own keys to accounts. The validity path is only as strong as that key until the binding moves
-   into the proven statement.
+3. **Key-to-account binding on the validity path** (`experiments/`, not reviewed here). The K10
+   `SigpressTerminalGate` trusts a registrar wallet to say which signers and messages a proof covers. A
+   compromised registrar can attribute signatures to accounts. The later K10 binding experiment
+   (`SigpressValidityGate`, `docs/decisions.md`) recomputes the signer/message root on chain and drops
+   that registrar, but by its own notes the **account ↔ pubkey** link is still unbound (it needs a
+   registry or an account-side check). Until that is closed, the validity path is not end-to-end
+   trustless.
 4. **The outer transaction is ECDSA.** Executors and relayers send normal secp256k1 transactions. That
    isn't an authorisation risk, but it is a censorship and gas-theft risk (`docs/sdk.md`).
 5. **Signer state.** WOTS keys are one-time and XMSS is stateful. The contracts are a backstop (nonce,
