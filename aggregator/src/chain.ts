@@ -27,16 +27,17 @@ export function loadDeployments(): Deployments {
   return JSON.parse(readFileSync(p, "utf8")) as Deployments;
 }
 
-export async function getClients() {
-  const rpc = process.env.RPC_URL ?? MONAD_TESTNET_RPC;
+/** opts override the env (RPC_URL, KEY_VAR) so one process can hold clients for several keys or nodes. */
+export async function getClients(opts: { rpc?: string; privateKey?: Hex; keyVar?: string } = {}) {
+  const rpc = opts.rpc ?? process.env.RPC_URL ?? MONAD_TESTNET_RPC;
   // KEY_VAR names the env var holding the key (default PRIVATE_KEY), so parallel runs can use separate keys.
-  const keyVar = process.env.KEY_VAR ?? "PRIVATE_KEY";
-  const pk = process.env[keyVar];
+  const keyVar = opts.keyVar ?? process.env.KEY_VAR ?? "PRIVATE_KEY";
+  const pk = opts.privateKey ?? process.env[keyVar];
   if (!pk) throw new Error(`${keyVar} not set (root .env)`);
   const account = privateKeyToAccount((pk.startsWith("0x") ? pk : `0x${pk}`) as Hex);
 
   let chainId = 10143;
-  if (process.env.RPC_URL) {
+  if (rpc !== MONAD_TESTNET_RPC) {
     const probe = createPublicClient({ transport: http(rpc) });
     chainId = await probe.getChainId();
   }
