@@ -1,5 +1,10 @@
 # Aggregator service and watchtower
 
+The service has two modes. **`MODE=validity`** is the trustless STARK path (section "Validity mode" below):
+every signature is proved, the proof is checked on chain, nothing needs a watchtower. **The default (`MODE`
+unset or `optimistic`)** is the optimistic path described first: a bonded root plus challenges. The optimistic
+path stays as the fallback (it needs no prover and confirms in seconds plus the window).
+
 The long-running half of the optimistic design. The **service** takes WOTS-signed ops for SigpressAccounts over HTTP, checks each one off chain, batches them, posts one Merkle root plus a bond to the OptimisticAggregator, waits out the challenge window, finalizes, then runs the whole batch in one `SigpressEntry.executeBundle()` tx. It also serves each batch's signatures (the data-availability, or DA, document) so anyone can check them. The **watchtower** is separate. It follows `BatchSubmitted` on any OptimisticAggregator, fetches each batch's signatures, verifies them all, and calls `challenge` on the first bad one while the window is open.
 
 Code: `aggregator/src/service/` (`batcher.ts` is the state machine, `server.ts` the HTTP API, `watchtower.ts`, `da.ts` the DA format and check, `store.ts` atomic file writes, `chain.ts` the chain adapter). The encoding and signing code is reused from `compact.ts`, `account.ts`, `op.ts`, `wots.ts` and `merkle.ts`.
@@ -149,3 +154,94 @@ Own instance, deployed for this service from the contracts at `cf5e08c` (dead-op
 - **Dishonest batch** (`pnpm service:tamper`: 4 leaves, signature 2 tampered, DA served by the "attacker"): [submitBatch](https://testnet.monadexplorer.com/tx/0x3132b5e266c013f81d26e256429c9cd916b2af28483ad413104b53a89451d7c1). The watchtower found signature 2 invalid, and its first challenge attempt hit an RPC 429. It retried on the next poll, about 10 s after the submit: [challenge → slashed](https://testnet.monadexplorer.com/tx/0x6465442f746b218bc14395100b4481b09f2bc6cccfaf99cf4c57e035af1b94a3) (204,987 gas charged).
 - The whole session (deploy plus both runs) cost about 0.45 MON at 102-203 gwei.
 - On local anvil only (`test/service-anvil.test.ts`): 10 ops → one batch → one `executeBundle`; a moved account's op sent as a dead op (`OpSkipped`) while the rest of the batch executed; a tampered batch slashed by the in-process watchtower; and a batch with withheld DA flagged as `DA MISSING`, then `closed-unchecked`.
+
+## Validity mode (`MODE=validity`)
+
+Added 4 Nov 2026. Code: `aggregator/src/service/validity-service.ts` (state machine + HTTP), `src/validity.ts`
+(prover driver, gate calldata), `contracts/src/ValidityEntry.sol` (execution).
+
+**Flow.** A user owns a `ValidityAccount`, created by `ValidityEntry.createAccount(pubkey, salt)`. Its constructor
+registers its leanXMSS public key with the entry (`keyOf[account]`, set once, by the account itself). To act, the user
+signs **its own op**: `message = ValidityEntry.opHash(account, nonce, target, value, data)` (= `keccak256(abi.encode(
+"sigpress-validity-op-v1" tag, chainId, entry, account, nonce, target, value, keccak256(data)))`), at the service's
+open slot. The service:
+
+1. **Accepts** the op if the registry holds this key for the account, the nonce is the account's next one, the
+   leanXMSS signature over the op hash verifies at the open slot, and the account has no other op at that slot.
+2. **Cuts** a batch when 2 × N ops are queued for the slot (N = the verifier's batch size: 256 or 1024) or the
+   oldest is `MAX_WAIT_MS` old. The slot closes at the cut; later ops must sign the next slot (`409` otherwise),
+   because every signer of one proof signs the same slot.
+3. **Pads** to exactly 2 × N with its own filler keys (pool of 2 × N keys, logSlots 10, created once under
+   `SERVICE_DIR/fillers/`) over throwaway messages, and writes the two per-signer batch files.
+4. **Proves** (binding-v2 prover, under the shared prover lock `/private/tmp/claude-501/sigpress-prover.lock`,
+   child process so the API stays up), recomputes the statement off chain, generates the verifier calldata.
+5. **Submits** to `SigpressBindV2Gate` (eth_call first; gas = estimate + 5%).
+6. **Executes** the batch's ops with one `ValidityEntry.execute(slot, left, right, ops)`: the entry recomputes the
+   batch commitment, requires `gate.accepted(commitment)`, and for each op checks the registered key is at
+   (side, index), the message there is the op hash with the account's next nonce, then calls the account (fixed
+   300k gas per op; a reverting call uses the nonce and does not revert the batch).
+
+```sh
+cd aggregator
+# Monad testnet, 2 x 256 (the gate and verifier are already deployed; this deploys the ValidityEntry once)
+SHAPE=2x256 KEY_VAR=PRIVATE_KEY_K14 pnpm validity:deploy
+MODE=validity SHAPE=2x256 KEY_VAR=PRIVATE_KEY_K14 pnpm service             # API on http://127.0.0.1:8548
+KEY_VAR=<another key> OPS=3 BAD=1 pnpm validity:demo                         # create accounts, sign, POST, wait
+
+# Local anvil: the whole stack (Poseidon1Hasher, generated verifier, gate, entry) from the research artifacts
+anvil --port 8555 --code-size-limit 131072 --hardfork prague --gas-limit 300000000 --block-time 1 &
+RPC_URL=http://127.0.0.1:8555 VALIDITY_DEPLOYMENTS=/tmp/v.json SHAPE=2x256 KEY_VAR=K0 pnpm validity:deploy
+RPC_URL=http://127.0.0.1:8555 VALIDITY_DEPLOYMENTS=/tmp/v.json MODE=validity SHAPE=2x256 KEY_VAR=K0 pnpm service
+```
+
+| Var | Default | Meaning |
+|---|---|---|
+| `MODE` | `optimistic` | `validity` = this mode |
+| `SHAPE` | `2x256` | `2x256` or `2x1024`: which deployed verifier/gate (batch capacity 512 or 2,048) |
+| `ENTRY` | from `deployments-validity-v2.json` | the ValidityEntry (must point at the shape's gate) |
+| `VALIDITY_DEPLOYMENTS` | `aggregator/deployments-validity-v2.json` | `{"<chainId>:<shape>": {verifier, gate, entry}}`; Monad's verifier/gate are built in |
+| `MAX_WAIT_MS` | `20000` | cut a non-full batch when its oldest op is this old |
+| `START_SLOT` | `1` | first slot of a fresh state (user keys must cover it: SDK keys sign slots `activationSlot .. + 2^logSlots`) |
+| `CONCURRENCY` | `8` | parallel CLI signs for fillers |
+| `PORT` / `HOST` / `TICK_MS` / `SERVICE_DIR` | `8548` / `127.0.0.1` / `1000` / `out/service/validity-<chainId>-<entry>/` | |
+
+**API.** `GET /validity` (also `/health`): `{entry, gate, shape, chainId, slot, capacity, queued, ops, batches}` —
+clients read `slot` here. `POST /ops`: `{ account, target, value, data, nonce?, publicKey (32 B SSZ), slot, signature
+(1,208 B) }` → `202` op view, `200` duplicate, `400` invalid (wrong key, nonce or signature), `409` stale slot or a
+second op of the account at this slot, `503` slot full. `GET /ops/:id` (id = the op hash): `{status: pending |
+batched | proving | accepted | executed | failed, side, index, callSuccess, error, batch}`. `GET /batches/:key`
+(`v0`, `v1`, ...): `{slot, status, ops, fillers, commitment, submitTx, executeTx, gasCharged, proveSeconds}`.
+
+**Crash safety.** `state.json` is written atomically at every step (cut → signed → proved → accepted → executed). On
+restart: a batch that crashed while its fillers were signing fails (the filler keys refuse to re-sign that slot) and
+its users re-sign at the next slot; a signed batch is re-proved from the saved
+batch files (filler keys never re-sign a slot: the KeyStore refuses); a proved batch checks `gate.accepted` before
+submitting again; execution skips ops whose on-chain nonce has moved past them. Unlike the optimistic batcher, txs
+are not pre-signed and persisted, so a crash between broadcast and receipt can, at worst, re-send a submit that then
+reverts `AlreadyAccepted` (not tested).
+
+**Trust model.** No watchtower and no bond: the gate accepts a batch only with a valid proof bound to every (pubkey,
+message) in calldata, and the entry runs an op only if its account's own key signed exactly that op. The service can
+still censor or delay (users can submit elsewhere: `execute` is permissionless, and anyone can prove a batch).
+Limits: the binding argument is ours and not externally reviewed; one key per account for life (no rotation; a
+logSlots 10 key covers 1,024 slots); one op per account per batch.
+
+**Measured on local anvil (4 Nov 2026, real prover and real generated verifier, 2 × 256):** 3 ValidityAccounts,
+one tampered op rejected with HTTP 400, 3 ops + 509 filler signers cut 9 s after POST, proved in 55.7 s, `gate.submit`
+15,882,913 gas, `ValidityEntry.execute` of the 3 ops 1,345,280 gas (mostly the 32 KB of pubkeys + messages it
+re-reads), 103 s from POST to executed. Anvil reports gas used (Monad charges the limit).
+
+**Measured on Monad testnet (4 Nov 2026, 2 × 256, wallet K14 `0x8bbF…47FB`):** ValidityEntry
+[`0x75cb16d3…26f2`](https://testnet.monadexplorer.com/tx/0x19f419f474c3ddce494c28e2f95a1a02ce627974758e2de376ecf5c165e99b42)
+(1,029,365 gas charged). `pnpm validity:demo` created 3 accounts
+([#0](https://testnet.monadexplorer.com/tx/0x6aa7e18d577fd5bf94733eab3721d67301c33773142789ccff138a1bbf566b52),
+[#1](https://testnet.monadexplorer.com/tx/0x310ad6b0c78da7dc488ea6f714747a79d5604d2c6710ae015963909fa5583894),
+[#2](https://testnet.monadexplorer.com/tx/0x5b8093b29dc5c632491e8723352044c76cd5e1b38060c45b901b48544b884787)); a
+tampered op got HTTP 400; 3 ops + 509 filler signers at slot 1, proved in 54.3 s.
+[`gate.submit`](https://testnet.monadexplorer.com/tx/0x984ae62647244bde811e7e6e411e0581aa977d9d2a59f489c06ef4f346a53699)
+charged 15,681,832 gas; [`ValidityEntry.execute`](https://testnet.monadexplorer.com/tx/0x7c7e2107316b97df668a73dfd638024f1b40aff6b241e6b5b2d472d776538845)
+ran all 3 ops (`callSuccess` true) for 1,419,789 gas charged. **Caveat from this run:** the service's first submit
+(`0x924dadb0…45db`) was never mined and never visible via `eth_getTransactionByHash`; re-sending the same raw tx was
+refused ("Missing or invalid parameters"). The submit above is that same calldata sent by hand with the same nonce and
+higher fees (`cast send`); `send()` in `src/validity.ts` now does this replacement itself after a 120 s receipt
+timeout (not yet exercised on chain). The service then resumed from `state.json`, saw `accepted`, and executed.
