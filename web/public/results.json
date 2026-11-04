@@ -5,15 +5,15 @@
     "calldataBytes": 2276
   },
   "batch": {
-    "txHash": "0x8ea9ebd4eb2f0cd8e7bee8f7619787523e1a9281b222fc2a74c98381058ccdb2",
+    "txHash": "0x97eda726a71056faf1376f346ea0e5eb00941700239f7a4f19bc78f65662fe68",
     "gasUsed": 110494,
     "count": 256,
-    "root": "0xc8765a9c241af1ab085e2b3fd691247f03ffa23ee592327275c07066897c2a6c",
+    "root": "0xf7b4f9e6a7f370f7dbef7bbade1424e61fb413ef0935584c73cf64cc34e4c399",
     "bytesPerOp": 0.890625
   },
   "tamper": {
-    "submitTx": "0xbf0eadaff66e9808751c18c08d0a03ad8a508ba12ce1b0f1a62dfb6e498ba493",
-    "challengeTx": "0x82319bcce81aaaf4b93bf8cbede4523737f5cf4c4a09b4127aa7d5527231e975",
+    "submitTx": "0x5edba90741117a38022e9f28d5f5cba003fea9b9b224b2942091a284928be073",
+    "challengeTx": "0xc910d4b060c07d2e9ed0f9a6e9728a9d0efe9e9c33e52a6c4a916ed2d81de4a2",
     "slashed": true
   },
   "execute": {
@@ -49,39 +49,39 @@
     "directGas": 186088
   },
   "stage": {
-    "startedAt": "2026-11-04T08:42:25.147Z",
+    "startedAt": "2026-11-04T08:53:13.812Z",
     "n": 256,
     "chainId": 10143,
     "account": "0x445a0c4780a8107158df60B18Ee5372497dc1D12",
     "batch": {
-      "txHash": "0x8ea9ebd4eb2f0cd8e7bee8f7619787523e1a9281b222fc2a74c98381058ccdb2",
-      "batchId": 5,
+      "txHash": "0x97eda726a71056faf1376f346ea0e5eb00941700239f7a4f19bc78f65662fe68",
+      "batchId": 10,
       "gasUsed": 110494,
       "inputBytes": 228,
       "bytesPerOp": 0.890625,
-      "signMs": 4390,
-      "confirmMs": 1204,
-      "at": "2026-11-04T08:42:31.109Z"
+      "signMs": 3621,
+      "confirmMs": 1056,
+      "at": "2026-11-04T08:53:21.260Z"
     },
     "comparison": {
       "naiveTx": "0xb8d292eefd8b71eacb6c63bb5a0a6a398de8b0d2e18fa227b76c2cf6644163f7",
-      "naiveFresh": true,
+      "naiveFresh": false,
       "naiveBytesPerOp": 2276,
       "naiveGasPerOp": 143278,
       "batchBytesPerOp": 0.890625,
       "batchGasPerOp": 431.6171875,
-      "at": "2026-11-04T08:42:32.422Z"
+      "at": "2026-11-04T08:53:22.430Z"
     },
     "tamper": {
-      "submitTx": "0xbf0eadaff66e9808751c18c08d0a03ad8a508ba12ce1b0f1a62dfb6e498ba493",
-      "challengeTx": "0x82319bcce81aaaf4b93bf8cbede4523737f5cf4c4a09b4127aa7d5527231e975",
-      "batchId": 6,
+      "submitTx": "0x5edba90741117a38022e9f28d5f5cba003fea9b9b224b2942091a284928be073",
+      "challengeTx": "0xc910d4b060c07d2e9ed0f9a6e9728a9d0efe9e9c33e52a6c4a916ed2d81de4a2",
+      "batchId": 11,
       "badIndex": 7,
       "slashed": true,
-      "challengeGas": 216395,
-      "checkMs": 45,
-      "at": "2026-11-04T08:42:39.968Z"
+      "challengeGas": 204244,
+      "checkMs": 43,
+      "at": "2026-11-04T08:53:31.193Z"
     },
-    "finishedAt": "2026-11-04T08:42:39.968Z"
+    "finishedAt": "2026-11-04T08:53:31.193Z"
   }
 }

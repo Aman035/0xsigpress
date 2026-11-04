@@ -46,13 +46,12 @@ const LIVE = bold(green("[LIVE on Monad testnet]"));
 const MODEL = bold(yellow("[CAPACITY MODEL, not live TPS]"));
 
 const STEP = process.env.STEP === "1";
-// One readline for the whole run; buffered lines are handed out one per pause. If stdin ends (piped
-// input), remaining pauses just continue.
+// One readline for the whole run. Enter only counts while a pause is waiting, so an accidental extra
+// press can't skip a beat (and piped `yes` can't flood memory). If stdin ends, remaining pauses continue.
 const rl = STEP ? createInterface({ input: process.stdin }) : undefined;
-const lines: string[] = [];
 const waiters: (() => void)[] = [];
 let stdinClosed = false;
-rl?.on("line", (l) => (waiters.length ? waiters.shift()!() : lines.push(l)));
+rl?.on("line", () => waiters.shift()?.());
 rl?.on("close", () => {
   stdinClosed = true;
   while (waiters.length) waiters.shift()!();
@@ -60,8 +59,7 @@ rl?.on("close", () => {
 async function pause(next: string) {
   if (!rl) return;
   process.stdout.write(dim(`\n  press Enter for ${next} ...`));
-  if (lines.length) lines.shift();
-  else if (!stdinClosed) await new Promise<void>((r) => waiters.push(r));
+  if (!stdinClosed) await new Promise<void>((r) => waiters.push(r));
   process.stdout.write("\n");
 }
 
@@ -120,7 +118,7 @@ for (const [name, tx, note] of capRows) {
 }
 console.log(dim(`\n  Block caps from MIP-12: ${fmt(BLOCK_BYTES)} B and ${fmt(TX_CAP)} tx per 300 ms block.`));
 console.log(dim(`  ML-DSA rows: K1 arithmetic in docs/decisions.md (sizes from FIPS 204). WOTS row: bytes from our testnet tx.`));
-console.log(`  ${bold("Naive PQ cuts block capacity by ~85-90%.")} ${dim("This is block capacity, not measured throughput.")}`);
+console.log(`  ${bold("Naive ML-DSA cuts the block ceiling ~85-90% at 400 B/tx (MIP-12 math), 58-76% at today's measured mainnet mix (1,728 B avg tx).")} ${dim("Block capacity, not measured throughput.")}`);
 await pause("Beat 2 (live batch)");
 
 // ---------- Beat 2: sign N ops, submit one batch ----------
